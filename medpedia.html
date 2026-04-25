@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>MEDPEDIA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;0,900;1,700&family=JetBrains+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08080f;
+  --surface: #0f0f1a;
+  --surface2: #161625;
+  --surface3: #1e1e30;
+  --border: rgba(255,255,255,0.06);
+  --border2: rgba(255,255,255,0.11);
+  --gold: #c9a84c;
+  --gold2: #f0cc6e;
+  --red-med: #e05252;
+  --blue-med: #4a9eff;
+  --green-med: #3dd68c;
+  --purple-med: #a78bfa;
+  --orange-med: #fb923c;
+  --teal-med: #2dd4bf;
+  --text: #e8e8f0;
+  --text-dim: #52526e;
+  --text-mid: #8888aa;
+  --r: 16px;
+  --r-sm: 10px;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{-webkit-tap-highlight-color:transparent;scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* GRAIN TEXTURE */
+body::before{
+  content:'';position:fixed;inset:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events:none;z-index:0;opacity:0.4;
+}
+
+/* AMBIENT */
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 55% 40% at 10% 5%, rgba(201,168,76,0.06) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 35% at 90% 90%, rgba(74,158,255,0.04) 0%, transparent 100%),
+    radial-gradient(ellipse 30% 30% at 50% 50%, rgba(61,214,140,0.02) 0%, transparent 100%);
+}
+
+.app{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:40px 24px 80px;}
+
+/* ── HEADER ── */
+.header{margin-bottom:48px;position:relative;}
+.header-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.logo-wrap{}
+.logo{
+  font-family:'Playfair Display',serif;
+  font-size:42px;font-weight:900;
+  letter-spacing:-1px;
+  background:linear-gradient(135deg,var(--gold) 0%,var(--gold2) 50%,var(--gold) 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  line-height:1;
+}
+.logo-sub{
+  font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:4px;color:var(--text-dim);margin-top:5px;text-transform:uppercase;
+}
+.header-date{
+  text-align:right;
+  font-family:'JetBrains Mono',monospace;
+}
+.header-date-day{font-size:28px;font-weight:500;color:var(--text);line-height:1;}
+.header-date-full{font-size:10px;color:var(--text-dim);letter-spacing:2px;margin-top:3px;text-transform:uppercase;}
+.header-divider{
+  height:1px;
+  background:linear-gradient(90deg,var(--gold),transparent);
+  margin-top:20px;opacity:0.3;
+}
+
+/* ── CATEGORY BADGE ── */
+.cat-row{display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+.cat-badge{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:3px;
+  text-transform:uppercase;padding:4px 12px;border-radius:20px;
+  border:1px solid;
+}
+.week-counter{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:1px;}
+
+/* Category colors */
+.cat-clinica{color:var(--red-med);background:rgba(224,82,82,0.08);border-color:rgba(224,82,82,0.2);}
+.cat-anatomia{color:var(--blue-med);background:rgba(74,158,255,0.08);border-color:rgba(74,158,255,0.2);}
+.cat-farmacologia{color:var(--green-med);background:rgba(61,214,140,0.08);border-color:rgba(61,214,140,0.2);}
+.cat-patologia{color:var(--purple-med);background:rgba(167,139,250,0.08);border-color:rgba(167,139,250,0.2);}
+.cat-fisiologia{color:var(--teal-med);background:rgba(45,212,191,0.08);border-color:rgba(45,212,191,0.2);}
+.cat-chirurgia{color:var(--orange-med);background:rgba(251,146,60,0.08);border-color:rgba(251,146,60,0.2);}
+
+/* ── TOPIC TITLE ── */
+.topic-title-wrap{margin-bottom:32px;}
+.topic-title{
+  font-family:'Playfair Display',serif;
+  font-size:38px;font-weight:700;
+  line-height:1.15;letter-spacing:-0.5px;
+  color:var(--text);
+}
+.topic-subtitle{
+  font-family:'JetBrains Mono',monospace;
+  font-size:11px;color:var(--text-dim);
+  margin-top:8px;letter-spacing:1px;
+}
+
+/* ── CONTENT CARD ── */
+.content-area{display:flex;flex-direction:column;gap:20px;}
+
+.section-card{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:24px;
+  position:relative;overflow:hidden;
+  animation:fadeUp 0.4s ease both;
+}
+.section-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,var(--gold),transparent);
+  opacity:0.15;
+}
+
+@keyframes fadeUp{
+  from{opacity:0;transform:translateY(10px);}
+  to{opacity:1;transform:translateY(0);}
+}
+.section-card:nth-child(1){animation-delay:0.05s;}
+.section-card:nth-child(2){animation-delay:0.1s;}
+.section-card:nth-child(3){animation-delay:0.15s;}
+.section-card:nth-child(4){animation-delay:0.2s;}
+.section-card:nth-child(5){animation-delay:0.25s;}
+.section-card:nth-child(6){animation-delay:0.3s;}
+
+.section-tag{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;
+  color:var(--gold);opacity:0.7;margin-bottom:10px;
+}
+.section-title{
+  font-family:'Playfair Display',serif;
+  font-size:18px;font-weight:700;
+  margin-bottom:14px;color:var(--text);
+}
+.section-body{
+  font-size:14px;line-height:1.85;
+  color:var(--text-mid);
+}
+.section-body strong{color:var(--text);font-weight:500;}
+.section-body em{color:var(--gold2);font-style:normal;}
+
+/* KEY FACTS */
+.key-facts{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:10px;margin-top:16px;
+}
+.key-fact{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:12px 14px;
+}
+.kf-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:4px;}
+.kf-val{font-size:13px;font-weight:500;color:var(--text);}
+
+/* SPUNTI */
+.spunti-list{display:flex;flex-direction:column;gap:10px;margin-top:4px;}
+.spunto-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 14px;background:var(--surface2);
+  border:1px solid var(--border);border-radius:var(--r-sm);
+  font-size:13px;color:var(--text-mid);line-height:1.6;
+  cursor:pointer;transition:all 0.15s;
+}
+.spunto-item:hover{border-color:var(--border2);color:var(--text);}
+.spunto-arrow{color:var(--gold);font-size:14px;flex-shrink:0;margin-top:1px;}
+
+/* CURIOSITÀ highlight */
+.curiosita-card{
+  background:linear-gradient(135deg,rgba(201,168,76,0.06),rgba(201,168,76,0.02));
+  border:1px solid rgba(201,168,76,0.15);
+}
+.curiosita-card .section-tag{color:var(--gold);}
+
+/* LOADING STATE */
+.loading-state{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:80px 20px;gap:20px;
+  animation:fadeIn 0.3s ease;
+}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+.loading-pulse{
+  width:48px;height:48px;border-radius:50%;
+  border:2px solid rgba(201,168,76,0.15);
+  border-top-color:var(--gold);
+  animation:spin 0.9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;
+}
+.loading-sub{font-size:12px;color:var(--text-dim);text-align:center;max-width:280px;line-height:1.6;}
+
+/* ERROR STATE */
+.error-state{
+  background:rgba(224,82,82,0.06);border:1px solid rgba(224,82,82,0.15);
+  border-radius:var(--r);padding:28px;text-align:center;
+}
+.error-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--red-med);margin-bottom:8px;}
+.error-body{font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:16px;}
+
+/* CONTROLS */
+.controls{
+  display:flex;gap:10px;flex-wrap:wrap;
+  margin-top:32px;padding-top:24px;
+  border-top:1px solid var(--border);
+}
+.btn{
+  padding:10px 20px;border-radius:9px;
+  font-family:'JetBrains Mono',monospace;font-size:11px;
+  letter-spacing:2px;text-transform:uppercase;cursor:pointer;
+  transition:all 0.15s;border:1px solid;
+}
+.btn-primary{
+  background:linear-gradient(135deg,rgba(201,168,76,0.15),rgba(201,168,76,0.08));
+  border-color:rgba(201,168,76,0.3);color:var(--gold);
+}
+.btn-primary:hover{background:linear-gradient(135deg,rgba(201,168,76,0.25),rgba(201,168,76,0.12));border-color:var(--gold);}
+.btn-secondary{background:transparent;border-color:var(--border);color:var(--text-dim);}
+.btn-secondary:hover{border-color:var(--border2);color:var(--text);}
+.btn:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* HISTORY */
+.history-wrap{margin-top:40px;}
+.history-title{
+  font-family:'JetBrains Mono',monospace;font-size:9px;
+  letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);
+  margin-bottom:14px;
+}
+.history-list{display:flex;flex-direction:column;gap:8px;}
+.history-item{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 14px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--r-sm);
+  cursor:pointer;transition:all 0.15s;
+}
+.history-item:hover{border-color:var(--border2);}
+.history-date{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);width:70px;flex-shrink:0;}
+.history-name{font-size:13px;font-weight:500;flex:1;}
+.history-cat{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;color:var(--text-dim);}
+
+/* STREAK */
+.streak-bar{
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:var(--r-sm);padding:12px 16px;
+  margin-bottom:28px;
+}
+.streak-fire{font-size:22px;}
+.streak-num{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;color:var(--gold);line-height:1;}
+.streak-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-top:1px;}
+.streak-dots{display:flex;gap:4px;margin-left:auto;}
+.streak-dot{width:7px;height:7px;border-radius:50%;}
+.streak-dot.done{background:var(--gold);}
+.streak-dot.today{background:var(--gold2);box-shadow:0 0 6px var(--gold);}
+.streak-dot.empty{background:var(--surface3);}
+
+/* MOBILE */
+@media(max-width:600px){
+  .app{padding:24px 16px 80px;}
+  .logo{font-size:32px;}
+  .topic-title{font-size:28px;}
+  .key-facts{grid-template-columns:1fr 1fr;}
+  .controls{gap:8px;}
+  .btn{padding:9px 14px;font-size:10px;}
+}
+
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.07);border-radius:4px;}
+</style>
+</head>
+<body>
+<div class="ambient"></div>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-top">
+      <div class="logo-wrap">
+        <div class="logo">MEDPEDIA</div>
+        <div class="logo-sub">// Scibile Medico Quotidiano</div>
+      </div>
+      <div class="header-date">
+        <div class="header-date-day" id="hdr-day">—</div>
+        <div class="header-date-full" id="hdr-date">—</div>
+      </div>
+    </div>
+    <div class="header-divider"></div>
+  </div>
+
+  <!-- STREAK -->
+  <div class="streak-bar" id="streak-bar">
+    <div class="streak-fire">🔥</div>
+    <div>
+      <div class="streak-num" id="streak-num">0</div>
+      <div class="streak-label">Giorni consecutivi</div>
+    </div>
+    <div class="streak-dots" id="streak-dots"></div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div id="main-content">
+    <div class="loading-state">
+      <div class="loading-pulse"></div>
+      <div class="loading-text">Generazione in corso</div>
+      <div class="loading-sub">Claude sta selezionando e preparando l'argomento del giorno…</div>
+    </div>
+  </div>
+
+  <!-- CONTROLS (hidden initially) -->
+  <div class="controls" id="controls" style="display:none;">
+    <button class="btn btn-primary" id="btn-new" onclick="generateTopic(true)">↻ Nuovo Argomento</button>
+    <button class="btn btn-secondary" onclick="showHistory()">📋 Cronologia</button>
+    <button class="btn btn-secondary" id="btn-save" onclick="saveToFavorites()">★ Salva</button>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="history-wrap" id="history-wrap" style="display:none;">
+    <div class="history-title">Argomenti Precedenti</div>
+    <div class="history-list" id="history-list"></div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════ STORAGE ═══════════════
+const S = {
+  get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+};
+
+// ═══════════════ STATE ═══════════════
+let currentTopic = null;
+let isLoading = false;
+
+// Category rotation: 7-day balanced week
+// Mon=0: clinica, Tue=1: anatomia, Wed=2: patologia, Thu=3: clinica,
+// Fri=4: farmacologia, Sat=5: fisiologia, Sun=6: chirurgia
+const WEEKLY_CATS = [
+  {id:'clinica',    label:'Clinica Medica',  color:'var(--red-med)'},
+  {id:'anatomia',   label:'Anatomia',        color:'var(--blue-med)'},
+  {id:'patologia',  label:'Patologia',       color:'var(--purple-med)'},
+  {id:'clinica',    label:'Clinica Medica',  color:'var(--red-med)'},
+  {id:'farmacologia',label:'Farmacologia',   color:'var(--green-med)'},
+  {id:'fisiologia', label:'Fisiologia',      color:'var(--teal-med)'},
+  {id:'chirurgia',  label:'Chirurgia',       color:'var(--orange-med)'},
+];
+
+const CAT_CSS = {
+  clinica:'cat-clinica',anatomia:'cat-anatomia',farmacologia:'cat-farmacologia',
+  patologia:'cat-patologia',fisiologia:'cat-fisiologia',chirurgia:'cat-chirurgia'
+};
+
+// ═══════════════ DATE UTILS ═══════════════
+function todayKey(){return new Date().toISOString().split('T')[0];}
+function formatDate(isoStr){
+  const d=new Date(isoStr+'T00:00:00');
+  return d.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
+}
+function getDayOfWeek(){return new Date().getDay();} // 0=Sun
+function getWeekDayIdx(){const d=new Date().getDay();return d===0?6:d-1;} // Mon=0
+
+// ═══════════════ STREAK ═══════════════
+function updateStreak(){
+  const history = S.get('mp_history',[]);
+  const today = todayKey();
+  let streak = 0;
+  let d = new Date();
+  while(true){
+    const key = d.toISOString().split('T')[0];
+    if(history.find(h=>h.date===key)){streak++;d.setDate(d.getDate()-1);}
+    else break;
+    if(streak>365)break;
+  }
+  document.getElementById('streak-num').textContent=streak;
+  // Last 7 days dots
+  const dots=document.getElementById('streak-dots');
+  dots.innerHTML=Array.from({length:7},(_,i)=>{
+    const dd=new Date();dd.setDate(dd.getDate()-(6-i));
+    const k=dd.toISOString().split('T')[0];
+    const done=history.find(h=>h.date===k);
+    const isToday=k===today;
+    return `<div class="streak-dot ${isToday&&done?'today':done?'done':'empty'}"></div>`;
+  }).join('');
+}
+
+// ═══════════════ HEADER ═══════════════
+function initHeader(){
+  const now=new Date();
+  const days=['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'];
+  document.getElementById('hdr-day').textContent=days[now.getDay()];
+  document.getElementById('hdr-date').textContent=now.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
+}
+
+// ═══════════════ GENERATE TOPIC ═══════════════
+async function generateTopic(forceNew=false){
+  if(isLoading)return;
+
+  const today=todayKey();
+  const history=S.get('mp_history',[]);
+  const saved=S.get('mp_today',null);
+
+  // Use cached topic for today unless forcing new
+  if(!forceNew && saved && saved.date===today){
+    renderTopic(saved);
+    updateStreak();
+    return;
+  }
+
+  isLoading=true;
+  document.getElementById('main-content').innerHTML=`
+    <div class="loading-state">
+      <div class="loading-pulse"></div>
+      <div class="loading-text">Generazione in corso</div>
+      <div class="loading-sub">Claude sta selezionando e preparando l'argomento del giorno…</div>
+    </div>`;
+  document.getElementById('controls').style.display='none';
+
+  // Get today's category
+  const dayIdx=getWeekDayIdx();
+  const cat=WEEKLY_CATS[dayIdx];
+
+  // Build list of already seen topics to avoid repetition
+  const seenTopics=history.slice(-60).map(h=>h.topic).join(', ');
+
+  const prompt=`Sei un professore universitario di medicina che genera schede didattiche per uno studente di medicina al 3° anno italiano.
+
+CATEGORIA OGGI: ${cat.label}
+GIORNO: ${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+
+ARGOMENTI GIÀ TRATTATI (da NON ripetere): ${seenTopics||'nessuno ancora'}
+
+Scegli UN argomento specifico, interessante e clinicamente rilevante nell'ambito della categoria ${cat.label}. Deve essere preciso (non generico — non "il cuore" ma "la stenosi aortica calcifica", non "i farmaci" ma "gli inibitori della pompa protonica").
+
+Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown, senza testo fuori dal JSON:
+
+{
+  "topic": "nome dell'argomento preciso",
+  "subtitle": "sottotitolo descrittivo in 10-15 parole",
+  "categoria": "${cat.id}",
+  "definizione": "paragrafo di 60-80 parole: definizione precisa, classificazione se applicabile, contesto nosologico",
+  "fisiopatologia": "paragrafo di 80-110 parole: meccanismi principali, cascate patogenetiche chiave, termini tecnici corretti",
+  "clinica": "paragrafo di 80-110 parole: presentazione clinica, sintomi e segni caratteristici, decorso naturale",
+  "diagnosi": "paragrafo di 70-90 parole: iter diagnostico, esami chiave, diagnosi differenziale principale",
+  "terapia": "paragrafo di 70-90 parole: approccio terapeutico, farmaci principali con meccanismo, follow-up",
+  "curiosita": "60-80 parole: un fatto storico, scoperta o aspetto insolito che rende memorabile questo argomento",
+  "key_facts": [
+    {"label": "Incidenza", "value": "valore epidemiologico reale"},
+    {"label": "Picco d'età", "value": "fascia d'età tipica"},
+    {"label": "M:F ratio", "value": "rapporto sesso se rilevante"},
+    {"label": "Mortalità", "value": "dato se rilevante"}
+  ],
+  "spunti": [
+    "Primo spunto di approfondimento specifico e actionable",
+    "Secondo spunto correlato a una patologia o concetto collegato",
+    "Terzo spunto su aspetto fisiopatologico avanzato",
+    "Quarto spunto su novità terapeutica o ricerca recente"
+  ]
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:2500,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+
+    const data=await response.json();
+    const raw=data.content.find(c=>c.type==='text')?.text||'';
+
+    // Clean and parse JSON — handle possible truncation
+    let cleaned=raw.replace(/```json|```/g,'').trim();
+    // If JSON is truncated, try to close it
+    if(!cleaned.endsWith('}')){
+      // Count open braces/brackets and close them
+      let opens = (cleaned.match(/{/g)||[]).length - (cleaned.match(/}/g)||[]).length;
+      let openArr = (cleaned.match(/\[/g)||[]).length - (cleaned.match(/\]/g)||[]).length;
+      // Remove trailing incomplete string/value
+      cleaned = cleaned.replace(/,?\s*"[^"]*$/, '');
+      cleaned = cleaned.replace(/,?\s*"[^"]*":\s*"[^"]*$/, '');
+      cleaned = cleaned.replace(/,?\s*"[^"]*":\s*\[$/, '');
+      for(let i=0;i<openArr;i++) cleaned += ']';
+      for(let i=0;i<opens;i++) cleaned += '}';
+    }
+    let topicData;
+    try {
+      topicData=JSON.parse(cleaned);
+    } catch(e2) {
+      // Last resort: extract fields manually with regex
+      const extract=(key)=>{const m=raw.match(new RegExp('"'+key+'":\s*"((?:[^"\\]|\\.)*)'));return m?m[1]:'';};
+      topicData={
+        topic: extract('topic')||'Argomento del giorno',
+        subtitle: extract('subtitle')||'',
+        categoria: extract('categoria')||'clinica',
+        definizione: extract('definizione')||'',
+        fisiopatologia: extract('fisiopatologia')||'',
+        clinica: extract('clinica')||'',
+        diagnosi: extract('diagnosi')||'',
+        terapia: extract('terapia')||'',
+        curiosita: extract('curiosita')||'',
+        key_facts:[], spunti:[]
+      };
+    }
+
+    // Add metadata
+    topicData.date=today;
+    topicData.catLabel=cat.label;
+    topicData.catColor=cat.color;
+
+    // Save to history
+    const h=S.get('mp_history',[]);
+    if(!h.find(x=>x.date===today)){
+      h.push({date:today,topic:topicData.topic,categoria:topicData.categoria,catLabel:cat.label});
+      S.set('mp_history',h);
+    }
+    S.set('mp_today',topicData);
+
+    currentTopic=topicData;
+    renderTopic(topicData);
+    updateStreak();
+
+  } catch(err){
+    document.getElementById('main-content').innerHTML=`
+      <div class="error-state">
+        <div class="error-title">Errore di generazione</div>
+        <div class="error-body">Non è stato possibile generare l'argomento di oggi.<br>Controlla la connessione e riprova.<br><small style="opacity:0.5;font-family:monospace">${err.message}</small></div>
+        <button class="btn btn-primary" onclick="generateTopic(true)">↻ Riprova</button>
+      </div>`;
+  }
+  isLoading=false;
+}
+
+// ═══════════════ RENDER ═══════════════
+function renderTopic(t){
+  const dayIdx=getWeekDayIdx();
+  const cat=WEEKLY_CATS[dayIdx];
+  const h=S.get('mp_history',[]);
+  const weekNum=Math.ceil(h.length/7);
+
+  document.getElementById('main-content').innerHTML=`
+    <div class="cat-row">
+      <div class="cat-badge ${CAT_CSS[t.categoria]||'cat-clinica'}">${t.catLabel||t.categoria}</div>
+      <div class="week-counter">Argomento #${h.length} · Settimana ${weekNum}</div>
+    </div>
+
+    <div class="topic-title-wrap">
+      <div class="topic-title">${t.topic}</div>
+      <div class="topic-subtitle">${t.subtitle||''}</div>
+    </div>
+
+    <div class="content-area">
+
+      <div class="section-card">
+        <div class="section-tag">01 — Definizione</div>
+        <div class="section-body">${t.definizione}</div>
+        ${t.key_facts&&t.key_facts.length?`
+        <div class="key-facts">
+          ${t.key_facts.map(kf=>`
+            <div class="key-fact">
+              <div class="kf-label">${kf.label}</div>
+              <div class="kf-val">${kf.value}</div>
+            </div>`).join('')}
+        </div>`:''}
+      </div>
+
+      <div class="section-card">
+        <div class="section-tag">02 — Fisiopatologia</div>
+        <div class="section-title">Meccanismi</div>
+        <div class="section-body">${t.fisiopatologia}</div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-tag">03 — Quadro Clinico</div>
+        <div class="section-title">Presentazione</div>
+        <div class="section-body">${t.clinica}</div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-tag">04 — Diagnosi</div>
+        <div class="section-title">Iter Diagnostico</div>
+        <div class="section-body">${t.diagnosi}</div>
+      </div>
+
+      <div class="section-card">
+        <div class="section-tag">05 — Terapia</div>
+        <div class="section-title">Approccio Terapeutico</div>
+        <div class="section-body">${t.terapia}</div>
+      </div>
+
+      <div class="section-card curiosita-card">
+        <div class="section-tag">✦ Curiosità</div>
+        <div class="section-body">${t.curiosita}</div>
+      </div>
+
+      ${t.spunti&&t.spunti.length?`
+      <div class="section-card">
+        <div class="section-tag">06 — Spunti di Approfondimento</div>
+        <div class="section-title">Vai Oltre</div>
+        <div class="spunti-list">
+          ${t.spunti.map(s=>`
+            <div class="spunto-item">
+              <span class="spunto-arrow">→</span>
+              <span>${s}</span>
+            </div>`).join('')}
+        </div>
+      </div>`:''}
+
+    </div>
+  `;
+
+  document.getElementById('controls').style.display='flex';
+}
+
+// ═══════════════ HISTORY ═══════════════
+function showHistory(){
+  const hw=document.getElementById('history-wrap');
+  if(hw.style.display==='block'){hw.style.display='none';return;}
+  const history=S.get('mp_history',[]).slice().reverse();
+  if(!history.length){hw.style.display='none';return;}
+  document.getElementById('history-list').innerHTML=history.map(h=>`
+    <div class="history-item">
+      <div class="history-date">${h.date}</div>
+      <div class="history-name">${h.topic}</div>
+      <div class="history-cat">${h.catLabel}</div>
+    </div>`).join('');
+  hw.style.display='block';
+  hw.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ═══════════════ SAVE FAVORITES ═══════════════
+function saveToFavorites(){
+  if(!currentTopic)return;
+  const favs=S.get('mp_favorites',[]);
+  const exists=favs.find(f=>f.topic===currentTopic.topic);
+  if(exists){
+    alert('Già nei salvati!');return;
+  }
+  favs.push({...currentTopic,savedAt:new Date().toISOString()});
+  S.set('mp_favorites',favs);
+  const btn=document.getElementById('btn-save');
+  btn.textContent='★ Salvato!';btn.style.color='var(--gold)';btn.style.borderColor='rgba(201,168,76,0.3)';
+  setTimeout(()=>{btn.textContent='★ Salva';btn.style.color='';btn.style.borderColor='';},2000);
+}
+
+// ═══════════════ INIT ═══════════════
+initHeader();
+updateStreak();
+generateTopic();
+</script>
+</body>
+</html>
