@@ -704,71 +704,95 @@ function resetApiKey(){
 }
 
 function buildPrompt(cat, seenTopics){
-  const S3 = {
-    clinica:     '"clinica": "80-110 parole: presentazione clinica, sintomi e segni, decorso naturale"',
-    anatomia:    '"clinica": "80-110 parole: rilevanza clinica, varianti anatomiche, correlazioni con patologie"',
-    patologia:   '"clinica": "80-110 parole: quadro macroscopico e microscopico, aspetto istologico caratteristico"',
-    farmacologia:'"clinica": "80-110 parole: indicazioni terapeutiche principali, controindicazioni importanti"',
-    fisiologia:  '"clinica": "80-110 parole: alterazioni cliniche quando questo meccanismo e compromesso, patologie correlate"',
-    chirurgia:   '"clinica": "80-110 parole: indicazioni chirurgiche, presentazione che porta all intervento, timing operatorio"'
-  };
-  const S4 = {
-    clinica:     '"diagnosi": "70-90 parole: iter diagnostico, esami strumentali e laboratorio, diagnosi differenziale"',
-    anatomia:    '"diagnosi": "70-90 parole: metodiche di studio (imaging, TC, RMN), reperi anatomici chiave"',
-    patologia:   '"diagnosi": "70-90 parole: diagnosi istologica, marcatori immunoistochimici, diagnosi differenziale anatomo-patologica"',
-    farmacologia:'"diagnosi": "70-90 parole: monitoraggio terapeutico, interazioni farmacologiche, tossicita e antidoti"',
-    fisiologia:  '"diagnosi": "70-90 parole: come si valuta clinicamente, esami funzionali, valori normali e patologici"',
-    chirurgia:   '"diagnosi": "70-90 parole: work-up pre-operatorio, imaging necessario, criteri di operabilita"'
-  };
-  const S5 = {
-    clinica:     '"terapia": "70-90 parole: approccio terapeutico step-by-step, farmaci principali con meccanismo, follow-up"',
-    anatomia:    '"terapia": "70-90 parole: approcci chirurgici che coinvolgono questa struttura, accessi anatomici, rischi"',
-    patologia:   '"terapia": "70-90 parole: implicazioni terapeutiche, target molecolari, prognosi in base al pattern istologico"',
-    farmacologia:'"terapia": "70-90 parole: posologia standard, vie di somministrazione, aggiustamenti in IR/IE, schemi pratici"',
-    fisiologia:  '"terapia": "70-90 parole: come si ripristina o modula questo meccanismo, farmaci che agiscono su questo sistema"',
-    chirurgia:   '"terapia": "70-90 parole: tecnica chirurgica principale, approcci open/laparoscopico/robotico, complicanze, follow-up"'
-  };
-  const KF = {
-    clinica:     '[{"label":"Incidenza","value":"dato reale"},{"label":"Picco eta","value":"fascia tipica"},{"label":"M:F ratio","value":"rapporto"},{"label":"Mortalita","value":"dato se rilevante"}]',
-    anatomia:    '[{"label":"Struttura","value":"tipo anatomico"},{"label":"Vascolarizzazione","value":"arteria principale"},{"label":"Innervazione","value":"nervo principale"},{"label":"Varianti","value":"frequenza varianti"}]',
-    patologia:   '[{"label":"Incidenza","value":"dato reale"},{"label":"Tipo lesione","value":"benigna/maligna"},{"label":"Marcatori","value":"principali IHC"},{"label":"Prognosi","value":"outlook generale"}]',
-    farmacologia:'[{"label":"Classe","value":"categoria farmacologica"},{"label":"Target","value":"recettore o enzima"},{"label":"Emivita","value":"durata azione"},{"label":"Eff. avversi","value":"principali"}]',
-    fisiologia:  '[{"label":"Parametro","value":"unita di misura"},{"label":"Valore normale","value":"range fisiologico"},{"label":"Organo chiave","value":"struttura principale"},{"label":"Regolazione","value":"meccanismo"}]',
-    chirurgia:   '[{"label":"Incidenza","value":"dato reale"},{"label":"Approccio","value":"tecnica prevalente"},{"label":"Complicanze","value":"principale rischio"},{"label":"Mortalita op.","value":"dato se disponibile"}]'
-  };
-  const id = cat.id;
-  const s3 = S3[id]||S3.clinica;
-  const s4 = S4[id]||S4.clinica;
-  const s5 = S5[id]||S5.clinica;
-  const kf = KF[id]||KF.clinica;
+  const clinicaLabel = {
+    clinica:     'sintomi e segni clinici, presentazione tipica, decorso naturale',
+    anatomia:    'rilevanza clinica della struttura, correlazioni con patologie, varianti importanti',
+    patologia:   'quadro macroscopico e microscopico, aspetto istologico caratteristico, grading se applicabile',
+    farmacologia:'indicazioni terapeutiche approvate, controindicazioni assolute e relative, popolazioni speciali',
+    fisiologia:  'cosa succede clinicamente quando questo meccanismo e compromesso, patologie che ne derivano',
+    chirurgia:   'indicazioni all'intervento, criteri di urgenza o elezione, valutazione pre-operatoria del paziente'
+  }[cat.id] || 'presentazione clinica, sintomi principali, decorso';
 
-  return `Sei un professore di medicina. Genera una scheda didattica completa per uno studente italiano al 3 anno di medicina.
+  const diagnosiLabel = {
+    clinica:     'iter diagnostico completo, esami di laboratorio e strumentali, diagnosi differenziale principale',
+    anatomia:    'metodiche di imaging per studiare questa struttura (ecografia, TC, RMN, RX), findings tipici',
+    patologia:   'criteri diagnostici istopatologici, marcatori immunoistochimici chiave, diagnosi differenziale anatomo-patologica',
+    farmacologia:'parametri da monitorare durante la terapia, valori target, segni di tossicita, interazioni pericolose',
+    fisiologia:  'come si misura e valuta clinicamente questo parametro, esami funzionali, range normali e cut-off patologici',
+    chirurgia:   'work-up pre-operatorio completo, imaging necessario, stadiazione se oncologica, consenso e rischi'
+  }[cat.id] || 'iter diagnostico, esami chiave, diagnosi differenziale';
 
-CATEGORIA: ${cat.label}
-NON ripetere questi argomenti: ${seenTopics||'nessuno'}
+  const terapiaLabel = {
+    clinica:     'trattamento farmacologico e non, prima linea e seconda linea, target terapeutici, follow-up',
+    anatomia:    'procedure chirurgiche o interventistiche che coinvolgono questa struttura, vie di accesso, complicanze',
+    patologia:   'implicazioni terapeutiche del quadro istologico, target molecolari, prognosi per pattern',
+    farmacologia:'schema posologico standard, vie di somministrazione, durata terapia, aggiustamenti in IR e IE',
+    fisiologia:  'farmaci e interventi che modulano questo sistema fisiologico, meccanismo e razionale terapeutico',
+    chirurgia:   'tecnica chirurgica principale passo per passo, approcci disponibili, complicanze intra e post-operatorie, follow-up'
+  }[cat.id] || 'approccio terapeutico, farmaci principali, follow-up';
 
-Scegli UN argomento SPECIFICO (es. non "il rene" ma "la sindrome nefrosica"). Compila TUTTE le sezioni con contenuto reale — nessuna sezione vuota.
+  const kfLabels = {
+    clinica:     [['Incidenza','frequenza nella popolazione'],['Picco eta','fascia piu colpita'],['M:F ratio','rapporto tra sessi'],['Mortalita','dato prognostico']],
+    anatomia:    [['Struttura','tipo anatomico'],['Vascolarizzazione','arteria principale'],['Innervazione','nervo principale'],['Varianti','frequenza varianti']],
+    patologia:   [['Incidenza','frequenza'],['Tipo','benigna o maligna'],['Marcatori IHC','principali'],['Prognosi','outlook generale']],
+    farmacologia:[['Classe','categoria'],['Target','recettore o enzima'],['Emivita','durata azione'],['Eff. avversi','principali']],
+    fisiologia:  [['Parametro','unita di misura'],['Valore normale','range'],['Organo chiave','struttura'],['Regolazione','meccanismo principale']],
+    chirurgia:   [['Incidenza','frequenza'],['Approccio','tecnica prevalente'],['Complicanze','principale rischio'],['Mortalita op.','dato']]
+  }[cat.id] || [['Incidenza','dato'],['Eta','fascia'],['Sesso','M:F'],['Prognosi','outlook']];
 
-Rispondi SOLO con JSON valido, zero backtick, zero markdown:
+  const kfJson = '[' + kfLabels.map(([l,v]) => `{"label":"${l}","value":"inserisci ${v} reale"}`).join(',') + ']';
 
-{
-  "topic": "argomento specifico",
-  "subtitle": "sottotitolo di 10-15 parole",
-  "categoria": "${cat.id}",
-  "definizione": "60-80 parole: definizione precisa, classificazione, contesto",
-  "fisiopatologia": "80-110 parole: meccanismi molecolari e cellulari principali",
-  ${s3},
-  ${s4},
-  ${s5},
-  "curiosita": "60-80 parole: fatto storico o aspetto insolito memorabile",
-  "key_facts": ${kf},
-  "spunti": [
-    "Spunto 1: argomento correlato da approfondire",
-    "Spunto 2: patologia o meccanismo collegato",
-    "Spunto 3: aspetto molecolare o fisiopatologico avanzato",
-    "Spunto 4: novita terapeutica o ricerca recente"
-  ]
-}`;
+  return 'Sei un professore di medicina clinica. Genera una scheda didattica COMPLETA per studente italiano 3 anno medicina.
+
+' +
+    'CATEGORIA: ' + cat.label + '
+' +
+    'ARGOMENTI GIA VISTI (non ripetere): ' + (seenTopics||'nessuno') + '
+
+' +
+    'Scegli UN argomento specifico e importante della categoria ' + cat.label + '.
+' +
+    'IMPORTANTE: ogni campo del JSON deve contenere testo descrittivo reale e completo, mai vuoto.
+
+' +
+    'Restituisci ESCLUSIVAMENTE questo JSON compilato, senza backtick ne markdown:
+
+' +
+    '{
+' +
+    '  "topic": "nome argomento specifico e preciso",
+' +
+    '  "subtitle": "una frase descrittiva di 10-15 parole",
+' +
+    '  "categoria": "' + cat.id + '",
+' +
+    '  "definizione": "scrivi qui 60-80 parole con definizione precisa, classificazione e contesto nosologico",
+' +
+    '  "fisiopatologia": "scrivi qui 80-110 parole sui meccanismi molecolari e cellulari principali, le cascate patogenetiche",
+' +
+    '  "clinica": "scrivi qui 80-110 parole su: ' + clinicaLabel + '",
+' +
+    '  "diagnosi": "scrivi qui 70-90 parole su: ' + diagnosiLabel + '",
+' +
+    '  "terapia": "scrivi qui 70-90 parole su: ' + terapiaLabel + '",
+' +
+    '  "curiosita": "scrivi qui 60-80 parole con un fatto storico o aspetto insolito che rende memorabile questo argomento",
+' +
+    '  "key_facts": ' + kfJson + ',
+' +
+    '  "spunti": [
+' +
+    '    "primo spunto di approfondimento specifico",
+' +
+    '    "secondo spunto su patologia o meccanismo collegato",
+' +
+    '    "terzo spunto su aspetto molecolare avanzato",
+' +
+    '    "quarto spunto su novita terapeutica recente"
+' +
+    '  ]
+' +
+    '}';
 }
 function finalizeTopic(raw, cat, today, history){
   let cleaned=raw.replace(/\`\`\`json|\`\`\`/g,'').trim();
