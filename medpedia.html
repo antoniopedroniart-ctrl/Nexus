@@ -342,7 +342,7 @@ body::before{
     <div class="loading-state">
       <div class="loading-pulse"></div>
       <div class="loading-text">Generazione in corso</div>
-      <div class="loading-sub">Claude sta selezionando e preparando l'argomento del giorno…</div>
+      <div class="loading-sub">Gemini sta generando la scheda medica del giorno…</div>
     </div>
   </div>
 
@@ -451,8 +451,16 @@ async function generateTopic(forceNew=false){
     <div class="loading-state">
       <div class="loading-pulse"></div>
       <div class="loading-text">Generazione in corso</div>
-      <div class="loading-sub">Claude sta selezionando e preparando l'argomento del giorno…</div>
+      <div class="loading-sub">Gemini sta generando la scheda medica del giorno…</div>
+      <div style="margin-top:20px;"><button class="btn btn-secondary" onclick="S.set('mp_today',null);S.set('mp_gemini_key','');location.reload();" style="font-size:10px;opacity:0.4;">Reset cache</button></div>
     </div>`;
+  // Safety timeout - if still loading after 20s, show error
+  setTimeout(()=>{
+    if(isLoading){
+      isLoading=false;
+      document.getElementById('main-content').innerHTML='<div class="error-state"><div class="error-title">Timeout</div><div class="error-body">La generazione ha impiegato troppo. Controlla la connessione.</div><div style="margin-top:16px;display:flex;gap:8px;justify-content:center;"><button class="btn btn-primary" onclick="generateTopic(true)">↻ Riprova</button><button class="btn btn-secondary" onclick="resetApiKey()">🔑 Cambia API Key</button></div></div>';
+    }
+  }, 22000);
   document.getElementById('controls').style.display='none';
 
   // Get today's category
@@ -478,6 +486,8 @@ async function generateTopic(forceNew=false){
     let lastErr='';
     for(const model of GEMINI_MODELS){
       try{
+        const controller=new AbortController();
+        const timeout=setTimeout(()=>controller.abort(),15000);
         const res=await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {method:'POST',headers:{'Content-Type':'application/json'},
@@ -687,7 +697,8 @@ async function retryWithAvailableModels(){
     try{
       const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {method:'POST',headers:{'Content-Type':'application/json'},
-         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2500}})});
+         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2500}}),signal:controller.signal})
+        clearTimeout(timeout);
       const d=await res.json();
       if(d.error) continue;
       raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
@@ -704,95 +715,40 @@ function resetApiKey(){
 }
 
 function buildPrompt(cat, seenTopics){
-  const clinicaLabel = {
-    clinica:     'sintomi e segni clinici, presentazione tipica, decorso naturale',
-    anatomia:    'rilevanza clinica della struttura, correlazioni con patologie, varianti importanti',
-    patologia:   'quadro macroscopico e microscopico, aspetto istologico caratteristico, grading se applicabile',
-    farmacologia:'indicazioni terapeutiche approvate, controindicazioni assolute e relative, popolazioni speciali',
-    fisiologia:  'cosa succede clinicamente quando questo meccanismo e compromesso, patologie che ne derivano',
-    chirurgia:   'indicazioni all'intervento, criteri di urgenza o elezione, valutazione pre-operatoria del paziente'
-  }[cat.id] || 'presentazione clinica, sintomi principali, decorso';
-
-  const diagnosiLabel = {
-    clinica:     'iter diagnostico completo, esami di laboratorio e strumentali, diagnosi differenziale principale',
-    anatomia:    'metodiche di imaging per studiare questa struttura (ecografia, TC, RMN, RX), findings tipici',
-    patologia:   'criteri diagnostici istopatologici, marcatori immunoistochimici chiave, diagnosi differenziale anatomo-patologica',
-    farmacologia:'parametri da monitorare durante la terapia, valori target, segni di tossicita, interazioni pericolose',
-    fisiologia:  'come si misura e valuta clinicamente questo parametro, esami funzionali, range normali e cut-off patologici',
-    chirurgia:   'work-up pre-operatorio completo, imaging necessario, stadiazione se oncologica, consenso e rischi'
-  }[cat.id] || 'iter diagnostico, esami chiave, diagnosi differenziale';
-
-  const terapiaLabel = {
-    clinica:     'trattamento farmacologico e non, prima linea e seconda linea, target terapeutici, follow-up',
-    anatomia:    'procedure chirurgiche o interventistiche che coinvolgono questa struttura, vie di accesso, complicanze',
-    patologia:   'implicazioni terapeutiche del quadro istologico, target molecolari, prognosi per pattern',
-    farmacologia:'schema posologico standard, vie di somministrazione, durata terapia, aggiustamenti in IR e IE',
-    fisiologia:  'farmaci e interventi che modulano questo sistema fisiologico, meccanismo e razionale terapeutico',
-    chirurgia:   'tecnica chirurgica principale passo per passo, approcci disponibili, complicanze intra e post-operatorie, follow-up'
-  }[cat.id] || 'approccio terapeutico, farmaci principali, follow-up';
-
-  const kfLabels = {
-    clinica:     [['Incidenza','frequenza nella popolazione'],['Picco eta','fascia piu colpita'],['M:F ratio','rapporto tra sessi'],['Mortalita','dato prognostico']],
-    anatomia:    [['Struttura','tipo anatomico'],['Vascolarizzazione','arteria principale'],['Innervazione','nervo principale'],['Varianti','frequenza varianti']],
-    patologia:   [['Incidenza','frequenza'],['Tipo','benigna o maligna'],['Marcatori IHC','principali'],['Prognosi','outlook generale']],
-    farmacologia:[['Classe','categoria'],['Target','recettore o enzima'],['Emivita','durata azione'],['Eff. avversi','principali']],
-    fisiologia:  [['Parametro','unita di misura'],['Valore normale','range'],['Organo chiave','struttura'],['Regolazione','meccanismo principale']],
-    chirurgia:   [['Incidenza','frequenza'],['Approccio','tecnica prevalente'],['Complicanze','principale rischio'],['Mortalita op.','dato']]
-  }[cat.id] || [['Incidenza','dato'],['Eta','fascia'],['Sesso','M:F'],['Prognosi','outlook']];
-
-  const kfJson = '[' + kfLabels.map(([l,v]) => `{"label":"${l}","value":"inserisci ${v} reale"}`).join(',') + ']';
-
-  return 'Sei un professore di medicina clinica. Genera una scheda didattica COMPLETA per studente italiano 3 anno medicina.
-
-' +
-    'CATEGORIA: ' + cat.label + '
-' +
-    'ARGOMENTI GIA VISTI (non ripetere): ' + (seenTopics||'nessuno') + '
-
-' +
-    'Scegli UN argomento specifico e importante della categoria ' + cat.label + '.
-' +
-    'IMPORTANTE: ogni campo del JSON deve contenere testo descrittivo reale e completo, mai vuoto.
-
-' +
-    'Restituisci ESCLUSIVAMENTE questo JSON compilato, senza backtick ne markdown:
-
-' +
-    '{
-' +
-    '  "topic": "nome argomento specifico e preciso",
-' +
-    '  "subtitle": "una frase descrittiva di 10-15 parole",
-' +
-    '  "categoria": "' + cat.id + '",
-' +
-    '  "definizione": "scrivi qui 60-80 parole con definizione precisa, classificazione e contesto nosologico",
-' +
-    '  "fisiopatologia": "scrivi qui 80-110 parole sui meccanismi molecolari e cellulari principali, le cascate patogenetiche",
-' +
-    '  "clinica": "scrivi qui 80-110 parole su: ' + clinicaLabel + '",
-' +
-    '  "diagnosi": "scrivi qui 70-90 parole su: ' + diagnosiLabel + '",
-' +
-    '  "terapia": "scrivi qui 70-90 parole su: ' + terapiaLabel + '",
-' +
-    '  "curiosita": "scrivi qui 60-80 parole con un fatto storico o aspetto insolito che rende memorabile questo argomento",
-' +
-    '  "key_facts": ' + kfJson + ',
-' +
-    '  "spunti": [
-' +
-    '    "primo spunto di approfondimento specifico",
-' +
-    '    "secondo spunto su patologia o meccanismo collegato",
-' +
-    '    "terzo spunto su aspetto molecolare avanzato",
-' +
-    '    "quarto spunto su novita terapeutica recente"
-' +
-    '  ]
-' +
-    '}';
+  const labels = {
+    clinica:      {c:"presentazione clinica, sintomi e segni caratteristici, decorso naturale", d:"iter diagnostico, esami strumentali e laboratorio, diagnosi differenziale", t:"trattamento farmacologico e non, prima e seconda linea, follow-up", kf:[["Incidenza","frequenza nella popolazione"],["Picco eta","fascia piu colpita"],["M:F ratio","rapporto tra sessi"],["Mortalita","dato prognostico"]]},
+    anatomia:     {c:"rilevanza clinica della struttura, correlazioni con patologie, varianti importanti", d:"metodiche di imaging (ecografia, TC, RMN, RX) per studiare questa struttura, findings tipici", t:"procedure chirurgiche o interventistiche che coinvolgono questa struttura, vie di accesso, complicanze", kf:[["Struttura","tipo anatomico"],["Vascolarizzazione","arteria principale"],["Innervazione","nervo principale"],["Varianti","frequenza varianti"]]},
+    patologia:    {c:"quadro macroscopico e microscopico, aspetto istologico caratteristico, grading se applicabile", d:"criteri diagnostici istopatologici, marcatori immunoistochimici chiave, diagnosi differenziale anatomo-patologica", t:"implicazioni terapeutiche del quadro istologico, target molecolari, prognosi per pattern", kf:[["Incidenza","frequenza"],["Tipo","benigna o maligna"],["Marcatori IHC","principali"],["Prognosi","outlook generale"]]},
+    farmacologia: {c:"indicazioni terapeutiche approvate, controindicazioni assolute e relative, popolazioni speciali", d:"parametri da monitorare durante terapia, valori target, segni di tossicita, interazioni pericolose", t:"schema posologico standard, vie di somministrazione, durata terapia, aggiustamenti in IR e IE", kf:[["Classe","categoria"],["Target","recettore o enzima"],["Emivita","durata azione"],["Eff. avversi","principali"]]},
+    fisiologia:   {c:"cosa succede clinicamente quando questo meccanismo e compromesso, patologie che ne derivano", d:"come si misura e valuta clinicamente questo parametro, esami funzionali, range normali e cut-off", t:"farmaci e interventi che modulano questo sistema fisiologico, meccanismo e razionale terapeutico", kf:[["Parametro","unita di misura"],["Valore normale","range"],["Organo chiave","struttura"],["Regolazione","meccanismo"]]},
+    chirurgia:    {c:"indicazioni alla chirurgia, criteri di urgenza o elezione, valutazione pre-operatoria del paziente", d:"work-up pre-operatorio completo, imaging necessario, stadiazione se oncologica, criteri di operabilita", t:"tecnica chirurgica principale passo per passo, approcci disponibili, complicanze intra e post-operatorie", kf:[["Incidenza","frequenza"],["Approccio","tecnica prevalente"],["Complicanze","principale rischio"],["Mortalita op.","dato"]]}
+  };
+  const L = labels[cat.id] || labels.clinica;
+  const kfJson = "[" + L.kf.map(function(x){return '{"label":"'+x[0]+'","value":"inserisci '+x[1]+' reale"}';}).join(",") + "]";
+  return "Sei un professore di medicina. Genera una scheda didattica COMPLETA per uno studente italiano al 3 anno di medicina.\n\n" +
+    "CATEGORIA: " + cat.label + "\n" +
+    "ARGOMENTI GIA VISTI (non ripetere): " + (seenTopics||"nessuno") + "\n\n" +
+    "Scegli UN argomento SPECIFICO e importante della categoria " + cat.label + ". Esempio: non generici come il cuore, ma specifici come la stenosi aortica calcifica.\n\n" +
+    "REGOLA ASSOLUTA: ogni campo del JSON deve contenere TESTO REALE E COMPLETO. Mai lasciare un campo vuoto o con solo il titolo della sezione.\n\n" +
+    "Restituisci ESCLUSIVAMENTE il seguente JSON compilato, senza backtick, senza markdown, senza testo aggiuntivo:\n\n" +
+    "{\n" +
+    "  \"topic\": \"scrivi qui il nome preciso e specifico dell argomento\",\n" +
+    "  \"subtitle\": \"scrivi qui una frase descrittiva di 10-15 parole\",\n" +
+    "  \"categoria\": \"" + cat.id + "\",\n" +
+    "  \"definizione\": \"scrivi qui 60-80 parole: definizione precisa, classificazione se esiste, contesto nosologico\",\n" +
+    "  \"fisiopatologia\": \"scrivi qui 80-110 parole: meccanismi molecolari e cellulari principali, cascate patogenetiche\",\n" +
+    "  \"clinica\": \"scrivi qui 80-110 parole su: " + L.c + "\",\n" +
+    "  \"diagnosi\": \"scrivi qui 70-90 parole su: " + L.d + "\",\n" +
+    "  \"terapia\": \"scrivi qui 70-90 parole su: " + L.t + "\",\n" +
+    "  \"curiosita\": \"scrivi qui 60-80 parole: un fatto storico, scoperta notevole o aspetto insolito memorabile\",\n" +
+    "  \"key_facts\": " + kfJson + ",\n" +
+    "  \"spunti\": [\n" +
+    "    \"primo spunto specifico di approfondimento\",\n" +
+    "    \"secondo spunto su patologia o meccanismo collegato\",\n" +
+    "    \"terzo spunto su aspetto molecolare avanzato\",\n" +
+    "    \"quarto spunto su novita terapeutica recente\"\n" +
+    "  ]\n" +
+    "}";
 }
 function finalizeTopic(raw, cat, today, history){
   let cleaned=raw.replace(/\`\`\`json|\`\`\`/g,'').trim();
@@ -840,6 +796,20 @@ function saveApiKey(){
 // ═══════════════ INIT ═══════════════
 initHeader();
 updateStreak();
+// Clear cached topic if it has empty sections
+(function(){
+  const saved = S.get('mp_today', null);
+  const today = todayKey();
+  if(saved && saved.date === today) {
+    const isEmpty = !saved.fisiopatologia || saved.fisiopatologia.length < 20 ||
+                    !saved.clinica || saved.clinica.length < 20 ||
+                    !saved.diagnosi || saved.diagnosi.length < 20;
+    if(isEmpty) {
+      S.set('mp_today', null);
+      console.log('Cleared empty cached topic');
+    }
+  }
+})();
 generateTopic();
 </script>
 
