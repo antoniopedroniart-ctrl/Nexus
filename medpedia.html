@@ -458,44 +458,8 @@ async function generateTopic(forceNew=false){
   // Get today's category
   const dayIdx=getWeekDayIdx();
   const cat=WEEKLY_CATS[dayIdx];
-
-  // Build list of already seen topics to avoid repetition
   const seenTopics=history.slice(-60).map(h=>h.topic).join(', ');
-
-  const prompt=`Sei un professore universitario di medicina che genera schede didattiche per uno studente di medicina al 3° anno italiano.
-
-CATEGORIA OGGI: ${cat.label}
-GIORNO: ${new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
-
-ARGOMENTI GIÀ TRATTATI (da NON ripetere): ${seenTopics||'nessuno ancora'}
-
-Scegli UN argomento specifico, interessante e clinicamente rilevante nell'ambito della categoria ${cat.label}. Deve essere preciso (non generico — non "il cuore" ma "la stenosi aortica calcifica", non "i farmaci" ma "gli inibitori della pompa protonica").
-
-Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown, senza testo fuori dal JSON:
-
-{
-  "topic": "nome dell'argomento preciso",
-  "subtitle": "sottotitolo descrittivo in 10-15 parole",
-  "categoria": "${cat.id}",
-  "definizione": "paragrafo di 60-80 parole: definizione precisa, classificazione se applicabile, contesto nosologico",
-  "fisiopatologia": "paragrafo di 80-110 parole: meccanismi principali, cascate patogenetiche chiave, termini tecnici corretti",
-  "clinica": "paragrafo di 80-110 parole: presentazione clinica, sintomi e segni caratteristici, decorso naturale",
-  "diagnosi": "paragrafo di 70-90 parole: iter diagnostico, esami chiave, diagnosi differenziale principale",
-  "terapia": "paragrafo di 70-90 parole: approccio terapeutico, farmaci principali con meccanismo, follow-up",
-  "curiosita": "60-80 parole: un fatto storico, scoperta o aspetto insolito che rende memorabile questo argomento",
-  "key_facts": [
-    {"label": "Incidenza", "value": "valore epidemiologico reale"},
-    {"label": "Picco d'età", "value": "fascia d'età tipica"},
-    {"label": "M:F ratio", "value": "rapporto sesso se rilevante"},
-    {"label": "Mortalità", "value": "dato se rilevante"}
-  ],
-  "spunti": [
-    "Primo spunto di approfondimento specifico e actionable",
-    "Secondo spunto correlato a una patologia o concetto collegato",
-    "Terzo spunto su aspetto fisiopatologico avanzato",
-    "Quarto spunto su novità terapeutica o ricerca recente"
-  ]
-}`;
+  const prompt=buildPrompt(cat,seenTopics);
 
   try {
     const apiKey=S.get('mp_gemini_key','');
@@ -505,21 +469,27 @@ Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown, senza 
       return;
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-      {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          contents:[{parts:[{text:prompt}]}],
-          generationConfig:{temperature:0.9,maxOutputTokens:2500}
-        })
-      }
-    );
-
-    const data=await response.json();
-    if(data.error){throw new Error(data.error.message||'Gemini API error');}
-    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text||'';
+    // Try models in order until one works
+    const GEMINI_MODELS=[
+      'gemini-1.5-flash','gemini-1.5-flash-latest',
+      'gemini-pro','gemini-1.0-pro','gemini-1.0-pro-latest'
+    ];
+    let raw='';
+    let lastErr='';
+    for(const model of GEMINI_MODELS){
+      try{
+        const res=await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+          {method:'POST',headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2500}})}
+        );
+        const d=await res.json();
+        if(d.error){lastErr=d.error.message;continue;}
+        raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+        if(raw){break;}
+      }catch(e){lastErr=e.message;continue;}
+    }
+    if(!raw){throw new Error('Nessun modello disponibile. '+lastErr);}
 
     // Clean and parse JSON — handle possible truncation
     let cleaned=raw.replace(/```json|```/g,'').trim();
@@ -555,29 +525,34 @@ Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown, senza 
       };
     }
 
-    // Add metadata
-    topicData.date=today;
-    topicData.catLabel=cat.label;
-    topicData.catColor=cat.color;
-
-    // Save to history
-    const h=S.get('mp_history',[]);
-    if(!h.find(x=>x.date===today)){
-      h.push({date:today,topic:topicData.topic,categoria:topicData.categoria,catLabel:cat.label});
-      S.set('mp_history',h);
-    }
-    S.set('mp_today',topicData);
-
-    currentTopic=topicData;
-    renderTopic(topicData);
-    updateStreak();
+    finalizeTopic(raw, cat, today, history);
 
   } catch(err){
+    // Try to list available models to help diagnose
+    let modelsList = '';
+    try {
+      const apiKey=S.get('mp_gemini_key','');
+      const lr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      const ld = await lr.json();
+      if(ld.models) {
+        const names = ld.models.filter(m=>m.supportedGenerationMethods?.includes('generateContent')).map(m=>m.name.replace('models/',''));
+        modelsList = names.length ? `<div style="margin-top:12px;padding:12px;background:var(--surface2);border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-mid);text-align:left;"><div style="color:var(--gold);margin-bottom:6px;letter-spacing:2px;">MODELLI DISPONIBILI:</div>${names.map(n=>`<div>· ${n}</div>`).join('')}</div>` : '';
+        // Auto-retry with first available model
+        if(names.length) {
+          window._availableModels = names.filter(n=>!n.includes('embedding')&&!n.includes('aqa'));
+          setTimeout(()=>retryWithAvailableModels(), 500);
+          return;
+        }
+      }
+    } catch(e2){}
     document.getElementById('main-content').innerHTML=`
       <div class="error-state">
         <div class="error-title">Errore di generazione</div>
-        <div class="error-body">Non è stato possibile generare l'argomento di oggi.<br>Controlla la connessione e riprova.<br><small style="opacity:0.5;font-family:monospace">${err.message}</small></div>
-        <button class="btn btn-primary" onclick="generateTopic(true)">↻ Riprova</button>
+        <div class="error-body">Non è stato possibile generare l'argomento di oggi.<br><small style="opacity:0.5;font-family:monospace">${err.message}</small>${modelsList}</div>
+        <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="generateTopic(true)">↻ Riprova</button>
+          <button class="btn btn-secondary" onclick="resetApiKey()">🔑 Cambia API Key</button>
+        </div>
       </div>`;
   }
   isLoading=false;
@@ -695,6 +670,99 @@ function saveToFavorites(){
   setTimeout(()=>{btn.textContent='★ Salva';btn.style.color='';btn.style.borderColor='';},2000);
 }
 
+
+
+async function retryWithAvailableModels(){
+  const models = window._availableModels || [];
+  if(!models.length) return;
+  const apiKey=S.get('mp_gemini_key','');
+  const today=todayKey();
+  const history=S.get('mp_history',[]);
+  const dayIdx=getWeekDayIdx();
+  const cat=WEEKLY_CATS[dayIdx];
+  const seenTopics=history.slice(-60).map(h=>h.topic).join(', ');
+  const prompt = buildPrompt(cat, seenTopics);
+  let raw='';
+  for(const model of models){
+    try{
+      const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        {method:'POST',headers:{'Content-Type':'application/json'},
+         body:JSON.stringify({contents:[{parts:[{text:prompt}]}],generationConfig:{temperature:0.9,maxOutputTokens:2500}})});
+      const d=await res.json();
+      if(d.error) continue;
+      raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
+      if(raw) break;
+    }catch(e){continue;}
+  }
+  if(!raw){isLoading=false;return;}
+  finalizeTopic(raw, cat, today, history);
+}
+
+function resetApiKey(){
+  S.set('mp_gemini_key','');
+  showApiKeyModal();
+}
+
+function buildPrompt(cat, seenTopics){
+  return `Sei un professore universitario di medicina che genera schede didattiche per uno studente di medicina al 3° anno italiano.
+
+CATEGORIA OGGI: ${cat.label}
+ARGOMENTI GIÀ TRATTATI (da NON ripetere): ${seenTopics||'nessuno ancora'}
+
+Scegli UN argomento specifico e clinicamente rilevante nell'ambito della categoria ${cat.label}. Deve essere preciso (non "il cuore" ma "la stenosi aortica calcifica").
+
+Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown:
+
+{
+  "topic": "nome argomento preciso",
+  "subtitle": "sottotitolo descrittivo 10-15 parole",
+  "categoria": "${cat.id}",
+  "definizione": "60-80 parole: definizione precisa, classificazione, contesto nosologico",
+  "fisiopatologia": "80-110 parole: meccanismi principali, cascate patogenetiche, termini tecnici",
+  "clinica": "80-110 parole: presentazione clinica, sintomi e segni, decorso naturale",
+  "diagnosi": "70-90 parole: iter diagnostico, esami chiave, diagnosi differenziale",
+  "terapia": "70-90 parole: approccio terapeutico, farmaci principali, follow-up",
+  "curiosita": "60-80 parole: fatto storico o aspetto insolito memorabile",
+  "key_facts": [
+    {"label": "Incidenza", "value": "dato epidemiologico"},
+    {"label": "Picco età", "value": "fascia tipica"},
+    {"label": "M:F ratio", "value": "rapporto sesso"},
+    {"label": "Mortalità", "value": "dato se rilevante"}
+  ],
+  "spunti": [
+    "Spunto approfondimento 1",
+    "Spunto approfondimento 2",
+    "Spunto approfondimento 3",
+    "Spunto approfondimento 4"
+  ]
+}`;
+}
+
+function finalizeTopic(raw, cat, today, history){
+  let cleaned=raw.replace(/\`\`\`json|\`\`\`/g,'').trim();
+  if(!cleaned.endsWith('}')){
+    cleaned=cleaned.replace(/,?\s*"[^"]*$/,'');
+    cleaned=cleaned.replace(/,?\s*"[^"]*":\s*"[^"]*$/,'');
+    let opens=(cleaned.match(/{/g)||[]).length-(cleaned.match(/}/g)||[]).length;
+    let openArr=(cleaned.match(/\[/g)||[]).length-(cleaned.match(/\]/g)||[]).length;
+    for(let i=0;i<openArr;i++)cleaned+=']';
+    for(let i=0;i<opens;i++)cleaned+='}';
+  }
+  let topicData;
+  try{topicData=JSON.parse(cleaned);}
+  catch(e){
+    const extract=(key)=>{const m=raw.match(new RegExp('"'+key+'":\\s*"((?:[^"\\\\]|\\\\.)*)'));return m?m[1]:'';};
+    topicData={topic:extract('topic')||'Argomento del giorno',subtitle:extract('subtitle')||'',categoria:cat.id,definizione:extract('definizione')||'',fisiopatologia:extract('fisiopatologia')||'',clinica:extract('clinica')||'',diagnosi:extract('diagnosi')||'',terapia:extract('terapia')||'',curiosita:extract('curiosita')||'',key_facts:[],spunti:[]};
+  }
+  topicData.date=today;topicData.catLabel=cat.label;topicData.catColor=cat.color;
+  const h=history;
+  if(!h.find(x=>x.date===today)){h.push({date:today,topic:topicData.topic,categoria:topicData.categoria,catLabel:cat.label});S.set('mp_history',h);}
+  S.set('mp_today',topicData);
+  currentTopic=topicData;
+  renderTopic(topicData);
+  updateStreak();
+  isLoading=false;
+}
 
 function showApiKeyModal(){
   document.getElementById('apikey-modal').style.display='flex';
