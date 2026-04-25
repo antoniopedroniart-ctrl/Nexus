@@ -460,7 +460,7 @@ async function generateTopic(forceNew=false){
       isLoading=false;
       document.getElementById('main-content').innerHTML='<div class="error-state"><div class="error-title">Timeout</div><div class="error-body">La generazione ha impiegato troppo. Controlla la connessione.</div><div style="margin-top:16px;display:flex;gap:8px;justify-content:center;"><button class="btn btn-primary" onclick="generateTopic(true)">↻ Riprova</button><button class="btn btn-secondary" onclick="resetApiKey()">🔑 Cambia API Key</button></div></div>';
     }
-  }, 22000);
+  }, 35000);
   document.getElementById('controls').style.display='none';
 
   // Get today's category
@@ -471,6 +471,7 @@ async function generateTopic(forceNew=false){
 
   try {
     const apiKey=S.get('mp_gemini_key','');
+    console.log('API key present:', !!apiKey, apiKey ? apiKey.substring(0,8)+'...' : 'NONE');
     if(!apiKey){
       showApiKeyModal();
       isLoading=false;
@@ -479,15 +480,15 @@ async function generateTopic(forceNew=false){
 
     // Try models in order until one works
     const GEMINI_MODELS=[
-      'gemini-2.0-flash-lite','gemini-2.0-flash',
-      'gemini-2.0-flash-001','gemini-2.0-flash-lite-001','gemini-2.5-flash'
+      'gemini-2.0-flash','gemini-2.5-flash',
+      'gemini-2.0-flash-001','gemini-2.0-flash-lite-001','gemini-2.0-flash-lite'
     ];
     let raw='';
     let lastErr='';
     for(const model of GEMINI_MODELS){
       try{
         const controller=new AbortController();
-        const timeout=setTimeout(()=>controller.abort(),15000);
+        const timeout=setTimeout(()=>controller.abort(),30000);
         const res=await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {method:'POST',headers:{'Content-Type':'application/json'},
@@ -497,7 +498,7 @@ async function generateTopic(forceNew=false){
         if(d.error){lastErr=d.error.message;continue;}
         raw=d.candidates?.[0]?.content?.parts?.[0]?.text||'';
         if(raw){break;}
-      }catch(e){lastErr=e.message;continue;}
+      }catch(e){lastErr=e.message;console.error('Model '+model+' error:',e.message);continue;}
     }
     if(!raw){throw new Error('Nessun modello disponibile. '+lastErr);}
 
