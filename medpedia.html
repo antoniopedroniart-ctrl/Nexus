@@ -704,40 +704,72 @@ function resetApiKey(){
 }
 
 function buildPrompt(cat, seenTopics){
-  return `Sei un professore universitario di medicina che genera schede didattiche per uno studente di medicina al 3° anno italiano.
+  const S3 = {
+    clinica:     '"clinica": "80-110 parole: presentazione clinica, sintomi e segni, decorso naturale"',
+    anatomia:    '"clinica": "80-110 parole: rilevanza clinica, varianti anatomiche, correlazioni con patologie"',
+    patologia:   '"clinica": "80-110 parole: quadro macroscopico e microscopico, aspetto istologico caratteristico"',
+    farmacologia:'"clinica": "80-110 parole: indicazioni terapeutiche principali, controindicazioni importanti"',
+    fisiologia:  '"clinica": "80-110 parole: alterazioni cliniche quando questo meccanismo e compromesso, patologie correlate"',
+    chirurgia:   '"clinica": "80-110 parole: indicazioni chirurgiche, presentazione che porta all intervento, timing operatorio"'
+  };
+  const S4 = {
+    clinica:     '"diagnosi": "70-90 parole: iter diagnostico, esami strumentali e laboratorio, diagnosi differenziale"',
+    anatomia:    '"diagnosi": "70-90 parole: metodiche di studio (imaging, TC, RMN), reperi anatomici chiave"',
+    patologia:   '"diagnosi": "70-90 parole: diagnosi istologica, marcatori immunoistochimici, diagnosi differenziale anatomo-patologica"',
+    farmacologia:'"diagnosi": "70-90 parole: monitoraggio terapeutico, interazioni farmacologiche, tossicita e antidoti"',
+    fisiologia:  '"diagnosi": "70-90 parole: come si valuta clinicamente, esami funzionali, valori normali e patologici"',
+    chirurgia:   '"diagnosi": "70-90 parole: work-up pre-operatorio, imaging necessario, criteri di operabilita"'
+  };
+  const S5 = {
+    clinica:     '"terapia": "70-90 parole: approccio terapeutico step-by-step, farmaci principali con meccanismo, follow-up"',
+    anatomia:    '"terapia": "70-90 parole: approcci chirurgici che coinvolgono questa struttura, accessi anatomici, rischi"',
+    patologia:   '"terapia": "70-90 parole: implicazioni terapeutiche, target molecolari, prognosi in base al pattern istologico"',
+    farmacologia:'"terapia": "70-90 parole: posologia standard, vie di somministrazione, aggiustamenti in IR/IE, schemi pratici"',
+    fisiologia:  '"terapia": "70-90 parole: come si ripristina o modula questo meccanismo, farmaci che agiscono su questo sistema"',
+    chirurgia:   '"terapia": "70-90 parole: tecnica chirurgica principale, approcci open/laparoscopico/robotico, complicanze, follow-up"'
+  };
+  const KF = {
+    clinica:     '[{"label":"Incidenza","value":"dato reale"},{"label":"Picco eta","value":"fascia tipica"},{"label":"M:F ratio","value":"rapporto"},{"label":"Mortalita","value":"dato se rilevante"}]',
+    anatomia:    '[{"label":"Struttura","value":"tipo anatomico"},{"label":"Vascolarizzazione","value":"arteria principale"},{"label":"Innervazione","value":"nervo principale"},{"label":"Varianti","value":"frequenza varianti"}]',
+    patologia:   '[{"label":"Incidenza","value":"dato reale"},{"label":"Tipo lesione","value":"benigna/maligna"},{"label":"Marcatori","value":"principali IHC"},{"label":"Prognosi","value":"outlook generale"}]',
+    farmacologia:'[{"label":"Classe","value":"categoria farmacologica"},{"label":"Target","value":"recettore o enzima"},{"label":"Emivita","value":"durata azione"},{"label":"Eff. avversi","value":"principali"}]',
+    fisiologia:  '[{"label":"Parametro","value":"unita di misura"},{"label":"Valore normale","value":"range fisiologico"},{"label":"Organo chiave","value":"struttura principale"},{"label":"Regolazione","value":"meccanismo"}]',
+    chirurgia:   '[{"label":"Incidenza","value":"dato reale"},{"label":"Approccio","value":"tecnica prevalente"},{"label":"Complicanze","value":"principale rischio"},{"label":"Mortalita op.","value":"dato se disponibile"}]'
+  };
+  const id = cat.id;
+  const s3 = S3[id]||S3.clinica;
+  const s4 = S4[id]||S4.clinica;
+  const s5 = S5[id]||S5.clinica;
+  const kf = KF[id]||KF.clinica;
 
-CATEGORIA OGGI: ${cat.label}
-ARGOMENTI GIÀ TRATTATI (da NON ripetere): ${seenTopics||'nessuno ancora'}
+  return `Sei un professore di medicina. Genera una scheda didattica completa per uno studente italiano al 3 anno di medicina.
 
-Scegli UN argomento specifico e clinicamente rilevante nell'ambito della categoria ${cat.label}. Deve essere preciso (non "il cuore" ma "la stenosi aortica calcifica").
+CATEGORIA: ${cat.label}
+NON ripetere questi argomenti: ${seenTopics||'nessuno'}
 
-Rispondi SOLO con un oggetto JSON valido, senza backtick, senza markdown:
+Scegli UN argomento SPECIFICO (es. non "il rene" ma "la sindrome nefrosica"). Compila TUTTE le sezioni con contenuto reale — nessuna sezione vuota.
+
+Rispondi SOLO con JSON valido, zero backtick, zero markdown:
 
 {
-  "topic": "nome argomento preciso",
-  "subtitle": "sottotitolo descrittivo 10-15 parole",
+  "topic": "argomento specifico",
+  "subtitle": "sottotitolo di 10-15 parole",
   "categoria": "${cat.id}",
-  "definizione": "60-80 parole: definizione precisa, classificazione, contesto nosologico",
-  "fisiopatologia": "80-110 parole: meccanismi principali, cascate patogenetiche, termini tecnici",
-  "clinica": "80-110 parole: presentazione clinica, sintomi e segni, decorso naturale",
-  "diagnosi": "70-90 parole: iter diagnostico, esami chiave, diagnosi differenziale",
-  "terapia": "70-90 parole: approccio terapeutico, farmaci principali, follow-up",
+  "definizione": "60-80 parole: definizione precisa, classificazione, contesto",
+  "fisiopatologia": "80-110 parole: meccanismi molecolari e cellulari principali",
+  ${s3},
+  ${s4},
+  ${s5},
   "curiosita": "60-80 parole: fatto storico o aspetto insolito memorabile",
-  "key_facts": [
-    {"label": "Incidenza", "value": "dato epidemiologico"},
-    {"label": "Picco età", "value": "fascia tipica"},
-    {"label": "M:F ratio", "value": "rapporto sesso"},
-    {"label": "Mortalità", "value": "dato se rilevante"}
-  ],
+  "key_facts": ${kf},
   "spunti": [
-    "Spunto approfondimento 1",
-    "Spunto approfondimento 2",
-    "Spunto approfondimento 3",
-    "Spunto approfondimento 4"
+    "Spunto 1: argomento correlato da approfondire",
+    "Spunto 2: patologia o meccanismo collegato",
+    "Spunto 3: aspetto molecolare o fisiopatologico avanzato",
+    "Spunto 4: novita terapeutica o ricerca recente"
   ]
 }`;
 }
-
 function finalizeTopic(raw, cat, today, history){
   let cleaned=raw.replace(/\`\`\`json|\`\`\`/g,'').trim();
   if(!cleaned.endsWith('}')){
