@@ -924,13 +924,29 @@ const S = {
 };
 
 // ═══════════════ STATE ═══════════════
-let exams = S.get('nx_exams',[
-  {id:1,name:'Istologia',date:'2026-06-15',progress:55},
-  {id:2,name:'Biochimica 1',date:'2026-06-25',progress:20},
-  {id:3,name:'Biochimica 2',date:'2026-07-10',progress:10},
-  {id:4,name:'Anatomia',date:'2026-07-20',progress:5},
-  {id:5,name:'Immunologia',date:'2026-09-15',progress:0},
-]);
+// Version key — incrementa per forzare reset esami di default
+const EXAMS_VERSION = 'v3';
+const DEFAULT_EXAMS = [
+  {id:1,name:'Biochimica 1',date:'2026-06-10',progress:20},
+  {id:2,name:'Istologia',date:'2026-06-15',progress:55},
+  {id:3,name:'Anatomia',date:'2026-07-08',progress:5},
+  {id:4,name:'Biochimica 2',date:'2026-07-16',progress:10},
+  {id:5,name:'Immunologia',date:'2026-09-07',progress:0},
+];
+// Se la versione salvata è diversa, resetta gli esami di default mantenendo i progressi utente
+if(S.get('nx_exams_ver','') !== EXAMS_VERSION){
+  const saved = S.get('nx_exams', []);
+  // Mantieni i progressi degli esami default se già esistono
+  const merged = DEFAULT_EXAMS.map(de => {
+    const existing = saved.find(s => s.name === de.name);
+    return existing ? {...de, progress: existing.progress} : de;
+  });
+  // Aggiungi eventuali esami custom aggiunti dall'utente (id > 5)
+  const custom = saved.filter(s => !DEFAULT_EXAMS.find(d => d.name === s.name));
+  S.set('nx_exams', [...merged, ...custom]);
+  S.set('nx_exams_ver', EXAMS_VERSION);
+}
+let exams = S.get('nx_exams', DEFAULT_EXAMS);
 let studyLog = S.get('nx_study_log',[]);
 let gymLog = S.get('nx_gym_log',[]);
 let calEvents = S.get('nx_cal_events',[]);
@@ -1329,63 +1345,81 @@ function renderExams(){
 
 // ═══════════════ WORKOUT ═══════════════
 const workoutPlan=[
-  {day:'LUN',name:'Push Day',emoji:'🔺',rest:false,title:'PUSH DAY — Petto · Spalle · Tricipiti',meta:'~20 set · 70-80% 1RM · Rest 90-120s',
+  {day:'LUN',name:'Riposo',emoji:'😴',rest:true,title:'RIPOSO',meta:'Recupero — niente palestra oggi',exercises:[]},
+  {day:'MAR',name:'Push + Core',emoji:'🔺',rest:false,
+   title:'MARTEDÌ — PUSH · Petto · Spalle · Tricipiti + Core',
+   meta:'~22 set · 70-80% 1RM · Rest 90s · durata ~1h30 · sera/notte',
    exercises:[
-    {name:'Panca Piana con Bilanciere',sets:'4×6-8',muscles:['Petto','Tricipiti'],note:'Esercizio base — progressive overload'},
-    {name:'Panca Inclinata con Manubri',sets:'3×8-10',muscles:['Petto sup.'],note:'Enfasi capo superiore'},
-    {name:'Croci Cavi Bassi (crossover)',sets:'3×12-15',muscles:['Petto'],note:'Stretch massimale'},
-    {name:'Military Press con Bilanciere',sets:'4×6-8',muscles:['Deltoide ant.','Trap.'],note:'Esercizio base spalle'},
-    {name:'Alzate Laterali Manubri',sets:'4×12-15',muscles:['Deltoide lat.'],note:'Esecuzione stricta'},
-    {name:'French Press (EZ Bar)',sets:'3×10-12',muscles:['Tricipiti'],note:'Capo lungo'},
-    {name:'Push-down ai Cavi',sets:'3×12-15',muscles:['Tricipiti'],note:'Supinazione finale'},
+    {name:'— RISCALDAMENTO (10 min) —',sets:'',muscles:[],note:'5 min cardio leggero + mobilità spalle e polsi'},
+    {name:'Panca Piana con Bilanciere',sets:'4×5-6',muscles:['Petto','Tricipiti'],note:'⚡ Esercizio principale — FORZA pura, rest 2-3 min, progressive overload ogni settimana'},
+    {name:'Panca Inclinata con Manubri',sets:'4×8-10',muscles:['Petto sup.','Deltoide ant.'],note:'Enfasi capo clavicolare — eccentrica controllata 3s'},
+    {name:'Croci ai Cavi Bassi (Crossover)',sets:'3×12-15',muscles:['Petto'],note:'Stretch massimale nella fase eccentrica — peak contraction in cima'},
+    {name:'Military Press con Bilanciere',sets:'4×6-8',muscles:['Deltoide ant.','Trap.'],note:'Secondo esercizio di forza — schiena neutra, no arch esagerato'},
+    {name:'Alzate Laterali Manubri',sets:'4×12-15',muscles:['Deltoide lat.'],note:'Esecuzione stricta — no slancio, pausa 1s in cima'},
+    {name:'Push-down ai Cavi (presa prona)',sets:'3×12-15',muscles:['Tricipiti'],note:'Gomiti fissi ai fianchi — isolamento completo'},
+    {name:'French Press EZ Bar',sets:'3×10-12',muscles:['Tricipiti'],note:'Capo lungo — eccentrica lenta 3s'},
+    {name:'— CORE (15 min) —',sets:'',muscles:[],note:'Senza pausa tra gli esercizi — circuit style'},
+    {name:'Crunch Cable (presa alta)',sets:'3×15-20',muscles:['Retto addominale'],note:'Massima flessione lombare — squeeze in basso, non tirare il collo'},
+    {name:'Leg Raise Appeso alla Sbarra',sets:'3×12-15',muscles:['Retto add. inf.','Iliopsoas'],note:'Controllato — no slancio, porta le ginocchia al petto se necessario'},
+    {name:'Plank con variante laterale',sets:'3×45s',muscles:['Core','Obliqui'],note:'30s frontale + 15s laterale per lato — mantieni bacino neutro'},
    ]},
-  {day:'MAR',name:'Pull Day',emoji:'🔻',rest:false,title:'PULL DAY — Schiena · Bicipiti',meta:'~20 set · 70-80% 1RM · Rest 90-120s',
+  {day:'MER',name:'Pull + Core',emoji:'🔻',rest:false,
+   title:'MERCOLEDÌ — PULL · Schiena · Bicipiti + Core',
+   meta:'~22 set · 70-80% 1RM · Rest 90s · durata ~1h30 · sera/notte',
    exercises:[
-    {name:'Trazioni Sbarra (Pronata)',sets:'4×6-8',muscles:['Dorsali','Bicipiti'],note:'Aggiungere peso se necessario'},
-    {name:'Rematore con Bilanciere',sets:'4×6-8',muscles:['Dorsali','Romboidi'],note:'Gomiti vicini al corpo'},
-    {name:'Lat Machine Presa Neutra',sets:'3×10-12',muscles:['Dorsali'],note:'Full ROM'},
-    {name:'Cable Row Seduto',sets:'3×10-12',muscles:['Romboidi','Trap. inf.'],note:'Schiena dritta'},
-    {name:'Curl con Bilanciere',sets:'3×8-10',muscles:['Bicipite'],note:'Eccentrica 3s'},
-    {name:'Curl Concentrato Manubrio',sets:'3×10-12',muscles:['Bicipite'],note:'Unilaterale — picco contrazione'},
-    {name:'Face Pull ai Cavi',sets:'3×15-20',muscles:['Post. deltoide'],note:'Salute cuffia rotatori'},
+    {name:'— RISCALDAMENTO (10 min) —',sets:'',muscles:[],note:'Band pull-apart 2×15 + rotazioni spalle + deadhang 30s alla sbarra'},
+    {name:'Trazioni Sbarra Pronata',sets:'4×6-8',muscles:['Dorsali','Bicipiti','Romboidi'],note:'⚡ Esercizio principale — aggiungere peso se fai >8 reps pulite, rest 2-3 min'},
+    {name:'Rematore con Bilanciere (Pendlay Row)',sets:'4×6-8',muscles:['Dorsali','Romboidi','Trapezio'],note:'Busto quasi parallelo al suolo — partenza da terra ogni rep, esplosivo in salita'},
+    {name:'Lat Machine Presa Neutra Stretta',sets:'3×10-12',muscles:['Dorsali','Bicipiti'],note:'Full ROM — stretch completo in alto, pull fino al petto in basso'},
+    {name:'Cable Row Seduto (presa larga)',sets:'3×10-12',muscles:['Romboidi','Trap. inf.','Post. deltoide'],note:'Retrazione scapolare completa — no oscillazione del busto'},
+    {name:'Curl con Bilanciere (EZ o dritto)',sets:'4×6-8',muscles:['Bicipite'],note:'⚡ Forza bicipiti — eccentrica 3s, rest 2 min'},
+    {name:'Curl Martello ai Cavi',sets:'3×12-15',muscles:['Brachiale','Brachioradiale'],note:'Tensione costante — cavo basso, alternato o simultaneo'},
+    {name:'Face Pull ai Cavi',sets:'3×15-20',muscles:['Post. deltoide','Cuffia rotatori'],note:'Fondamentale per salute spalle — tirare verso il viso, gomiti alti'},
+    {name:'— CORE (15 min) —',sets:'',muscles:[],note:'Circuit style — minimo riposo'},
+    {name:'Russian Twist con Disco/Palla',sets:'3×20 (10 p/l)',muscles:['Obliqui','Retto add.'],note:'Tieni i piedi sollevati per intensificare — rotazione completa'},
+    {name:'Ab Wheel Rollout',sets:'3×8-12',muscles:['Retto add.','Obliqui','Serratus'],note:'Avanza solo finché riesci a tornare — no inarcamento lombare'},
+    {name:'Hollow Body Hold',sets:'3×30-45s',muscles:['Core completo'],note:'Lombare a terra, gambe e spalle sollevate — respira normalmente'},
    ]},
-  {day:'MER',name:'Riposo',emoji:'😴',rest:true,title:'RIPOSO ATTIVO',meta:'Recupero e mobilità',exercises:[]},
-  {day:'GIO',name:'Leg Day',emoji:'🦵',rest:false,title:'LEG DAY — Quadricipiti · Femorali · Glutei',meta:'~18 set · 70-80% 1RM · Rest 2-3 min',
+  {day:'GIO',name:'Legs + Core',emoji:'🦵',rest:false,
+   title:'GIOVEDÌ — LEGS · Quadricipiti · Femorali · Glutei + Core',
+   meta:'~20 set · 70-80% 1RM · Rest 2-3 min · durata ~1h30 · sera/notte',
    exercises:[
-    {name:'Squat con Bilanciere',sets:'4×6-8',muscles:['Quad.','Glutei','Femorali'],note:'Profondità completa'},
-    {name:'Romanian Deadlift (RDL)',sets:'4×8-10',muscles:['Femorali','Glutei'],note:'Schiena neutra'},
-    {name:'Leg Press 45°',sets:'3×10-12',muscles:['Quad.','Glutei'],note:'Variare posizione piedi'},
-    {name:'Affondi con Manubri',sets:'3×12 p/l',muscles:['Quad.','Glutei'],note:'Alternati'},
-    {name:'Leg Curl Sdraiato',sets:'3×10-12',muscles:['Femorali'],note:'Isolamento'},
-    {name:'Leg Extension',sets:'3×12-15',muscles:['Quad.'],note:'Fine sessione'},
-    {name:'Calf Raises in piedi',sets:'4×15-20',muscles:['Polpacci'],note:'Pausa 2s in cima'},
+    {name:'— RISCALDAMENTO (10 min) —',sets:'',muscles:[],note:'Squat a corpo libero 2×15 + hip hinge + mobilità anca e caviglia'},
+    {name:'Squat con Bilanciere (Low Bar)',sets:'5×5',muscles:['Quad.','Glutei','Femorali','Core'],note:'⚡ Esercizio RE — FORZA massima, rest 3 min, progressive overload ogni sessione'},
+    {name:'Romanian Deadlift (RDL)',sets:'4×8-10',muscles:['Femorali','Glutei','Erettori'],note:'Schiena neutra, bilanciere vicino alle gambe — stretch femorali completo'},
+    {name:'Leg Press 45° (piedi alti e larghi)',sets:'3×10-12',muscles:['Quad.','Glutei'],note:'Full ROM — non bloccare le ginocchia in estensione'},
+    {name:'Affondi Cammino con Manubri',sets:'3×12 p/l',muscles:['Quad.','Glutei','Femorali'],note:'Passo lungo — ginocchio posteriore sfiora terra'},
+    {name:'Leg Curl Sdraiato',sets:'3×10-12',muscles:['Femorali'],note:'Eccentrica 3s — dorsiflessione del piede per maggior attivazione'},
+    {name:'Leg Extension',sets:'3×12-15',muscles:['Quad.'],note:'Fine sessione — isometrica 2s in estensione'},
+    {name:'Calf Raises in Piedi (Smith o macchina)',sets:'4×15-20',muscles:['Gastrocnemio','Soleo'],note:'Pausa 2s in cima + stretch completo in basso'},
+    {name:'— CORE (10 min) —',sets:'',muscles:[],note:'Gambe già stanche — core più breve ma intenso'},
+    {name:'Plank con Alzata Alternata Braccia/Gambe',sets:'3×10 p/l',muscles:['Core','Glutei','Erettori'],note:'No rotazione del bacino — lento e controllato'},
+    {name:'Dead Bug',sets:'3×8 p/l',muscles:['Retto add.','Trasverso'],note:'Lombare a terra per tutto il set — movimento opposto braccio-gamba'},
    ]},
-  {day:'VEN',name:'Chest & Back',emoji:'💥',rest:false,title:'CHEST & BACK — Superserie antagoniste',meta:'~18 set · Superserie · Rest 90s',
+  {day:'VEN',name:'Upper + Core',emoji:'💥',rest:false,
+   title:'VENERDÌ — UPPER BODY COMPLETO · Petto · Schiena · Spalle · Braccia + Core',
+   meta:'~24 set · Superserie antagoniste · Rest 60-90s · durata ~1h30 · sera/notte',
    exercises:[
-    {name:'Panca Piana (SS con Rematore)',sets:'4×8',muscles:['Petto'],note:'SS1A — no pausa tra i due'},
-    {name:'Rematore Manubrio (SS)',sets:'4×8 p/l',muscles:['Dorsali'],note:'SS1B'},
-    {name:'Panca Inclinata (SS con Trazioni)',sets:'3×10',muscles:['Petto sup.'],note:'SS2A'},
-    {name:'Chin-up (SS)',sets:'3×8-10',muscles:['Dorsali','Bicipiti'],note:'SS2B'},
-    {name:'Croci Piana con Manubri',sets:'3×12',muscles:['Petto'],note:'Stretch profondo'},
-    {name:'Pulley Alto Presa Larga',sets:'3×12',muscles:['Dorsali'],note:'Focus stretch'},
+    {name:'— RISCALDAMENTO (8 min) —',sets:'',muscles:[],note:'Mobilità spalle + band pull-apart + push-up 2×10'},
+    {name:'Panca Piana Manubri (SS → Rematore)',sets:'4×8-10',muscles:['Petto'],note:'SS1A — esegui subito dopo il rematore senza pausa'},
+    {name:'Rematore con Manubrio (SS)',sets:'4×8-10 p/l',muscles:['Dorsali','Romboidi'],note:'SS1B — petto su panca inclinata, braccia lunghe'},
+    {name:'Panca Inclinata Manubri (SS → Chin-up)',sets:'3×10-12',muscles:['Petto sup.'],note:'SS2A'},
+    {name:'Chin-up Supinato (SS)',sets:'3×8-10',muscles:['Dorsali','Bicipiti'],note:'SS2B — se stanco usa assisted machine'},
+    {name:'Arnold Press',sets:'3×10-12',muscles:['Deltoide (tutti i capi)'],note:'Rotazione completa del polso — attiva tutti e 3 i capi del deltoide'},
+    {name:'Alzate Laterali al Cavo (basso)',sets:'3×15',muscles:['Deltoide lat.'],note:'Tensione costante — superiore ai manubri per il laterale'},
+    {name:'Curl Inclinato Manubri',sets:'3×10-12',muscles:['Bicipite (capo lungo)'],note:'Su panca inclinata 45° — massimo stretch, no slancio'},
+    {name:'Skull Crusher EZ Bar',sets:'3×10-12',muscles:['Tricipiti (capo lungo)'],note:'Abbassa fino alle orecchie — full ROM'},
+    {name:'— CORE (12 min) —',sets:'',muscles:[],note:'Finire forte — circuito ad alta intensità'},
+    {name:'Cable Crunch in ginocchio',sets:'3×15-20',muscles:['Retto add.'],note:'Piega il busto verso le ginocchia — non le anche verso il suolo'},
+    {name:'Toes to Bar (o Knee Raise)',sets:'3×10-15',muscles:['Retto add. inf.','Flessori anca'],note:'Se possibile porta le punte alla sbarra — core sempre in tensione'},
+    {name:'Side Plank con Rotazione (Thread the Needle)',sets:'3×8 p/l',muscles:['Obliqui','Core'],note:'Ottimo per obliqui — ruota il busto aprendo e chiudendo'},
    ]},
-  {day:'SAB',name:'Shoulders & Arms',emoji:'💪',rest:false,title:'SHOULDERS & ARMS — Spalle complete + Braccia',meta:'~20 set · 65-75% 1RM · Rest 60-90s',
-   exercises:[
-    {name:'Arnold Press',sets:'4×8-10',muscles:['Deltoide'],note:'Rotazione completa'},
-    {name:'Alzate Laterali (Cable)',sets:'4×12-15',muscles:['Deltoide lat.'],note:'Tensione costante'},
-    {name:'Alzate Posteriori Manubri',sets:'3×12-15',muscles:['Post. deltoide'],note:'Busto parallelo'},
-    {name:'Upright Row EZ Bar',sets:'3×10-12',muscles:['Deltoide','Trap.'],note:'Gomiti sopra le mani'},
-    {name:'Curl Alternato Manubri',sets:'3×10-12',muscles:['Bicipite'],note:'Supinazione finale'},
-    {name:'Curl Martello Cavi',sets:'3×12',muscles:['Brachiale'],note:'Brachiale e brachioradiale'},
-    {name:'Dip Parallele',sets:'3×10-12',muscles:['Tricipiti'],note:'Aggiungere peso se possibile'},
-    {name:'Skull Crusher EZ Bar',sets:'3×10-12',muscles:['Tricipiti'],note:'Capo lungo + laterale'},
-   ]},
-  {day:'DOM',name:'Riposo',emoji:'🧘',rest:true,title:'RIPOSO COMPLETO',meta:'Recupero · Stretching · Mobilità',exercises:[]},
+  {day:'SAB',name:'Riposo',emoji:'🧘',rest:true,title:'RIPOSO ATTIVO',meta:'Stretching · Mobilità · Camminata',exercises:[]},
+  {day:'DOM',name:'Riposo',emoji:'😴',rest:true,title:'RIPOSO COMPLETO',meta:'Recupero totale — dormi, mangia, cresci',exercises:[]},
 ];
 
-let selDay=new Date().getDay();
-// convert Sun=0 to Mon=0
-selDay=selDay===0?6:selDay-1;
+// selDay: Mon=0...Sun=6
+let selDay=(()=>{const d=new Date().getDay();return d===0?6:d-1;})();
 
 function renderWorkout(){
   document.getElementById('week-grid').innerHTML=workoutPlan.map((d,i)=>`
