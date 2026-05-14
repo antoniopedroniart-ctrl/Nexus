@@ -675,7 +675,98 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
   .cal-week-row{grid-template-columns:repeat(2,1fr);}
   .cal-plan-overview{grid-template-columns:repeat(2,1fr);}
 }
+
+/* ══ FIREBASE AUTH ══ */
+.auth-overlay{
+  position:fixed;inset:0;background:rgba(5,5,8,0.97);z-index:2000;
+  display:flex;align-items:center;justify-content:center;padding:24px;
+  backdrop-filter:blur(20px);
+}
+.auth-card{
+  background:var(--surface);border:1px solid var(--border2);
+  border-radius:var(--r);padding:40px 36px;max-width:420px;width:100%;
+  text-align:center;
+  box-shadow:0 0 60px rgba(0,245,255,0.06);
+}
+.auth-logo{
+  font-family:'Syne',sans-serif;font-size:32px;font-weight:800;letter-spacing:4px;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:6px;
+}
+.auth-sub{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-dim);letter-spacing:3px;margin-bottom:32px;}
+.auth-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:8px;}
+.auth-desc{font-size:13px;color:var(--text-mid);line-height:1.6;margin-bottom:28px;}
+.auth-google-btn{
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  width:100%;padding:13px 20px;
+  background:rgba(255,255,255,0.05);border:1px solid var(--border2);
+  border-radius:10px;color:var(--text);font-size:14px;font-weight:500;
+  cursor:pointer;transition:all 0.2s;font-family:'DM Sans',sans-serif;
+}
+.auth-google-btn:hover{background:rgba(255,255,255,0.09);border-color:rgba(255,255,255,0.2);}
+.auth-google-btn img{width:20px;height:20px;}
+.auth-note{font-size:11px;color:var(--text-dim);margin-top:16px;font-family:'JetBrains Mono',monospace;letter-spacing:0.5px;}
+
+.user-badge{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;margin:12px 16px 0;
+  background:rgba(255,255,255,0.03);border:1px solid var(--border);
+  border-radius:var(--r-sm);cursor:pointer;transition:all 0.15s;
+}
+.user-badge:hover{background:rgba(255,255,255,0.06);}
+.user-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;border:1px solid var(--border2);}
+.user-avatar-placeholder{
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--cyan),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;font-weight:700;color:#000;flex-shrink:0;
+}
+.user-info{flex:1;min-width:0;}
+.user-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-sync{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--text-dim);letter-spacing:1px;margin-top:1px;}
+.user-sync.syncing{color:var(--cyan);}
+.user-sync.synced{color:var(--green);}
+.user-sync.error{color:var(--pink);}
+.user-signout{font-size:11px;color:var(--text-dim);background:none;border:none;cursor:pointer;padding:2px 4px;transition:color 0.15s;}
+.user-signout:hover{color:var(--pink);}
+
+.sync-toast{
+  position:fixed;bottom:80px;right:16px;
+  background:var(--surface);border:1px solid var(--green);
+  border-radius:8px;padding:8px 14px;
+  font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green);
+  z-index:1000;opacity:0;transition:opacity 0.3s;pointer-events:none;
+  letter-spacing:1px;
+}
+.sync-toast.show{opacity:1;}
 </style>
+
+<!-- Firebase -->
+<script type="module" id="firebase-init">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot, serverTimestamp }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDQzTszNgqwvWX3UlNtGnsGClPLPrYbmgY",
+    authDomain: "nexus-antonio-70a50.firebaseapp.com",
+    projectId: "nexus-antonio-70a50",
+    storageBucket: "nexus-antonio-70a50.firebasestorage.app",
+    messagingSenderId: "382074755373",
+    appId: "1:382074755373:web:59af4eb910483de6d85ba4"
+  };
+
+  const fbApp = initializeApp(firebaseConfig);
+  const auth = getAuth(fbApp);
+  const db = getFirestore(fbApp);
+  const provider = new GoogleAuthProvider();
+
+  // Expose to global scope for non-module scripts
+  window._fb = { auth, db, provider, signInWithPopup, signOut, onAuthStateChanged, doc, setDoc, getDoc, onSnapshot, serverTimestamp };
+</script>
 </head>
 <body>
 <div class="ambient"></div>
@@ -703,7 +794,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
       <div class="nav-item" onclick="navigate('tools',this)"><span class="ni">⚙️</span><span>Tools</span></div>
       <a class="nav-item" href="medpedia.html" target="_blank" style="text-decoration:none;"><span class="ni">🧬</span><span>MEDPEDIA</span><span style="margin-left:auto;font-size:9px;opacity:0.4;font-family:'JetBrains Mono',monospace;">↗</span></a>
     </div>
-    <div class="sidebar-footer">v2.0 · Data locale<br>© 2026 NEXUS Dashboard</div>
+    <div id="user-badge-wrap"></div>
+    <div class="sidebar-footer">v3.0 · Firebase Sync<br>© 2026 NEXUS Dashboard</div>
   </aside>
 
   <!-- MAIN -->
@@ -2057,6 +2149,215 @@ function calScrollToToday(){
   if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.style.boxShadow='0 0 24px rgba(0,245,255,0.35)';setTimeout(()=>{el.style.boxShadow='';},1000);}
 }
 
+
+// ═══════════════ FIREBASE SYNC ═══════════════
+let fbUser = null;
+let fbUnsubscribe = null;
+let syncTimeout = null;
+let isSyncing = false;
+
+function showSyncToast(msg='✓ Sincronizzato', color='var(--green)'){
+  const t = document.getElementById('sync-toast');
+  if(!t) return;
+  t.textContent = msg;
+  t.style.borderColor = color;
+  t.style.color = color;
+  t.classList.add('show');
+  clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function updateUserBadge(user){
+  const wrap = document.getElementById('user-badge-wrap');
+  if(!wrap) return;
+  if(!user){ wrap.innerHTML = ''; return; }
+  const initials = user.displayName ? user.displayName.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() : '?';
+  wrap.innerHTML = `
+    <div class="user-badge" title="Clicca per disconnetterti">
+      ${user.photoURL
+        ? `<img class="user-avatar" src="${user.photoURL}" alt="${user.displayName}">`
+        : `<div class="user-avatar-placeholder">${initials}</div>`}
+      <div class="user-info">
+        <div class="user-name">${user.displayName||user.email}</div>
+        <div class="user-sync synced" id="sync-status">● Sincronizzato</div>
+      </div>
+      <button class="user-signout" onclick="fbSignOut()" title="Disconnetti">✕</button>
+    </div>`;
+}
+
+function setSyncStatus(status, msg){
+  const el = document.getElementById('sync-status');
+  if(!el) return;
+  el.className = 'user-sync ' + status;
+  el.textContent = msg;
+}
+
+async function fbSignIn(){
+  try {
+    const {auth, provider, signInWithPopup} = window._fb;
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    console.error('Sign in error:', e);
+    notify('Errore login: ' + e.message, 'var(--pink)');
+  }
+}
+
+async function fbSignOut(){
+  if(!confirm('Disconnettersi da NEXUS?')) return;
+  const {auth, signOut} = window._fb;
+  if(fbUnsubscribe){ fbUnsubscribe(); fbUnsubscribe = null; }
+  await signOut(auth);
+  fbUser = null;
+  updateUserBadge(null);
+  notify('Disconnesso', 'var(--text-dim)');
+}
+
+// ── PUSH local data to Firestore ──
+async function fbPush(){
+  if(!fbUser || isSyncing) return;
+  const {db, doc, setDoc, serverTimestamp} = window._fb;
+  isSyncing = true;
+  setSyncStatus('syncing', '↑ Salvataggio...');
+  try {
+    await setDoc(doc(db, 'users', fbUser.uid), {
+      exams: JSON.stringify(exams),
+      studyLog: JSON.stringify(studyLog.slice(-200)), // last 200 entries
+      gymLog: JSON.stringify(gymLog.slice(-200)),
+      calEvents: JSON.stringify(calEvents),
+      updatedAt: serverTimestamp(),
+      deviceId: navigator.userAgent.substring(0,50),
+    });
+    setSyncStatus('synced', '● Sincronizzato');
+    showSyncToast();
+  } catch(e){
+    console.error('Push error:', e);
+    setSyncStatus('error', '✕ Errore sync');
+    showSyncToast('✕ Errore sync', 'var(--pink)');
+  }
+  isSyncing = false;
+}
+
+// ── PULL data from Firestore and merge ──
+async function fbPull(remoteData){
+  if(!remoteData) return;
+  let changed = false;
+
+  // Merge exams — remote wins for dates, local wins for progress
+  if(remoteData.exams){
+    try {
+      const remote = JSON.parse(remoteData.exams);
+      const local = exams;
+      // Merge: keep all exams from remote, update progress from whichever is higher
+      const merged = remote.map(re => {
+        const le = local.find(x => x.id === re.id || x.name === re.name);
+        return le ? {...re, progress: Math.max(re.progress||0, le.progress||0)} : re;
+      });
+      // Add any local custom exams not in remote
+      local.forEach(le => {
+        if(!merged.find(x => x.id === le.id)) merged.push(le);
+      });
+      exams = merged;
+      S.set('nx_exams', exams);
+      changed = true;
+    } catch(e){}
+  }
+
+  // Merge studyLog — union by timestamp, deduplicate
+  if(remoteData.studyLog){
+    try {
+      const remote = JSON.parse(remoteData.studyLog);
+      const localTs = new Set(studyLog.map(l => l.timestamp));
+      const newEntries = remote.filter(r => r.timestamp && !localTs.has(r.timestamp));
+      if(newEntries.length){
+        studyLog = [...studyLog, ...newEntries].sort((a,b) => (a.timestamp||0)-(b.timestamp||0));
+        S.set('nx_study_log', studyLog);
+        changed = true;
+      }
+    } catch(e){}
+  }
+
+  // Merge gymLog — union by timestamp
+  if(remoteData.gymLog){
+    try {
+      const remote = JSON.parse(remoteData.gymLog);
+      const localTs = new Set(gymLog.map(g => g.timestamp));
+      const newEntries = remote.filter(r => r.timestamp && !localTs.has(r.timestamp));
+      if(newEntries.length){
+        gymLog = [...gymLog, ...newEntries].sort((a,b) => (a.timestamp||0)-(b.timestamp||0));
+        S.set('nx_gym_log', gymLog);
+        changed = true;
+      }
+    } catch(e){}
+  }
+
+  // Merge calEvents — union by id
+  if(remoteData.calEvents){
+    try {
+      const remote = JSON.parse(remoteData.calEvents);
+      const localIds = new Set(calEvents.map(e => e.id));
+      const newEvents = remote.filter(r => r.id && !localIds.has(r.id));
+      if(newEvents.length){
+        calEvents = [...calEvents, ...newEvents];
+        S.set('nx_cal_events', calEvents);
+        changed = true;
+      }
+    } catch(e){}
+  }
+
+  if(changed){
+    // Re-render current page
+    const activePage = document.querySelector('.page.active')?.id;
+    if(activePage === 'page-home') renderHome();
+    else if(activePage === 'page-esami') renderExams();
+    else if(activePage === 'page-tools') renderTools();
+    updateSubjectSelects();
+    showSyncToast('↓ Dati sincronizzati', 'var(--cyan)');
+  }
+}
+
+// ── Auth state listener ──
+function initFirebase(){
+  // Wait for Firebase module to load
+  if(!window._fb){ setTimeout(initFirebase, 300); return; }
+  const {auth, db, onAuthStateChanged, doc, onSnapshot} = window._fb;
+
+  onAuthStateChanged(auth, async (user) => {
+    if(user){
+      fbUser = user;
+      document.getElementById('auth-overlay').style.display = 'none';
+      updateUserBadge(user);
+      notify('✓ Accesso effettuato: ' + (user.displayName||user.email), 'var(--green)');
+
+      // Listen for realtime changes from other devices
+      if(fbUnsubscribe) fbUnsubscribe();
+      fbUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+        if(snapshot.exists() && !isSyncing){
+          fbPull(snapshot.data());
+        }
+      });
+
+      // Push local data immediately after login
+      setTimeout(fbPush, 1000);
+    } else {
+      fbUser = null;
+      document.getElementById('auth-overlay').style.display = 'flex';
+      updateUserBadge(null);
+    }
+  });
+}
+
+// ── Wrap S.set to auto-push on every data change ──
+const _origSset = S.set.bind(S);
+S.set = function(key, val){
+  _origSset(key, val);
+  // Debounce push — wait 2s after last change before pushing
+  clearTimeout(window._fbPushTimer);
+  window._fbPushTimer = setTimeout(() => { if(fbUser) fbPush(); }, 2000);
+};
+
+// Init Firebase after DOM is ready
+setTimeout(initFirebase, 500);
+
 // ═══════════════ PWA ═══════════════
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
@@ -2081,5 +2382,24 @@ window.addEventListener('appinstalled',()=>{
   notify('🎉 NEXUS installata!','var(--green)');
 });
 </script>
+
+<!-- AUTH OVERLAY -->
+<div class="auth-overlay" id="auth-overlay">
+  <div class="auth-card">
+    <div class="auth-logo">NEXUS</div>
+    <div class="auth-sub">// Dashboard Personale</div>
+    <div class="auth-title">Bentornato, Antonio</div>
+    <div class="auth-desc">Accedi con Google per sincronizzare automaticamente tutti i tuoi dati tra smartphone, tablet e PC.</div>
+    <button class="auth-google-btn" onclick="fbSignIn()">
+      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+      Accedi con Google
+    </button>
+    <div class="auth-note">🔒 I tuoi dati vengono salvati in modo sicuro su Firebase</div>
+  </div>
+</div>
+
+<!-- SYNC TOAST -->
+<div class="sync-toast" id="sync-toast">✓ Sincronizzato</div>
+
 </body>
 </html>
